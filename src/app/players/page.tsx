@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Player, PlayerStats, getPlayers, searchPlayers, getPlayerStats } from '@/lib/balldontlie/api';
 
 interface PlayerWithStats extends Player {
@@ -32,7 +32,7 @@ export default function PlayersPage() {
     return playersWithStats.filter(player => player.stats);
   };
 
-  const fetchPlayers = async (search?: string) => {
+  const fetchPlayers = useCallback(async (search?: string) => {
     try {
       setLoading(true);
       const normalizedSearch = search?.trim().toLowerCase();
@@ -53,11 +53,11 @@ export default function PlayersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchPlayers();
-  }, []);
+  }, [fetchPlayers]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();

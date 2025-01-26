@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { 
   HomeIcon, 
@@ -63,11 +64,14 @@ export default function Sidebar() {
 
       <div className="sticky inset-x-0 bottom-0 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
         <div className="flex items-center gap-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg p-2">
-          <img
-            alt="User"
-            src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
-            className="h-10 w-10 rounded-full object-cover"
-          />
+          <div className="relative h-10 w-10">
+            <Image
+              alt="User"
+              src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
+              fill
+              className="rounded-full object-cover"
+            />
+          </div>
           <div>
             <p className="text-sm font-medium text-gray-900 dark:text-white">John Doe</p>
             <p className="text-xs text-gray-500 dark:text-gray-400">john@example.com</p>
