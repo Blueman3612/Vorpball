@@ -43,7 +43,9 @@ export default function SignIn() {
             providers={['google']}
             onlyThirdPartyProviders={true}
             theme={localStorage.theme === 'dark' ? 'dark' : 'light'}
-            redirectTo="https://tzlaxvggnulilxrhqfel.supabase.co/auth/v1/callback"
+            redirectTo={process.env.NODE_ENV === 'production' 
+              ? 'https://vorpball.com/auth/callback'
+              : `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/callback`}
           />
         </div>
       </div>
