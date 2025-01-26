@@ -1,5 +1,11 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
-const supabase = createClientComponentClient();
+export const supabase = createClientComponentClient();
 
-export default supabase; 
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]; 

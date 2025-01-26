@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import Sidebar from "@/components/layout/Sidebar";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -34,16 +35,18 @@ export default function RootLayout({
         />
       </head>
       <body className={`${inter.className} dark:bg-gray-900`}>
-        <ThemeProvider>
-          <div className="flex h-screen overflow-hidden">
-            <aside className="w-64 hidden md:block">
-              <Sidebar />
-            </aside>
-            <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900">
-              {children}
-            </main>
-          </div>
-        </ThemeProvider>
+        <AuthProvider>
+          <ThemeProvider>
+            <div className="flex h-screen overflow-hidden">
+              <aside className="w-64 hidden md:block">
+                <Sidebar />
+              </aside>
+              <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900">
+                {children}
+              </main>
+            </div>
+          </ThemeProvider>
+        </AuthProvider>
       </body>
     </html>
   );

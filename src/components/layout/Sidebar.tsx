@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import { 
   HomeIcon, 
   UsersIcon, 
@@ -12,6 +13,7 @@ import {
   TableCellsIcon
 } from '@heroicons/react/24/outline';
 import ThemeToggle from '../ThemeToggle';
+import { useAuth } from '@/contexts/AuthContext';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: HomeIcon },
@@ -24,6 +26,27 @@ const navigation = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, signOut, loading } = useAuth();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/auth/signin');
+    }
+  }, [user, loading, router]);
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      router.push('/auth/signin');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
+  if (loading || !user) {
+    return null;
+  }
 
   return (
     <div className="flex h-screen flex-col justify-between border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
@@ -63,7 +86,7 @@ export default function Sidebar() {
       </div>
 
       <div className="sticky inset-x-0 bottom-0 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
-        <div className="flex items-center gap-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg p-2">
+        <div className="flex items-center gap-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg p-2" onClick={handleSignOut}>
           <div className="relative h-10 w-10">
             <Image
               alt="User"
@@ -73,8 +96,8 @@ export default function Sidebar() {
             />
           </div>
           <div>
-            <p className="text-sm font-medium text-gray-900 dark:text-white">John Doe</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">john@example.com</p>
+            <p className="text-sm font-medium text-gray-900 dark:text-white">{user.email}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Sign out</p>
           </div>
         </div>
       </div>
