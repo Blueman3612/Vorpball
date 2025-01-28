@@ -40,6 +40,14 @@ export interface Player {
   first_name: string;
   last_name: string;
   position: string;
+  height: string;
+  weight: string;
+  jersey_number: string;
+  college: string;
+  country: string;
+  draft_year: number | null;
+  draft_round: number | null;
+  draft_number: number | null;
   team: {
     id: number;
     name: string;
@@ -71,13 +79,38 @@ export interface PlayerStats {
   ft_pct: number;
 }
 
-export const getPlayers = async (page = 1, per_page = 25) => {
+export const getPlayers = async (cursor?: number, per_page = 25, signal?: AbortSignal) => {
   try {
-    console.log('Fetching players...');
-    const response = await api.get(`/players?page=${page}&per_page=${per_page}`);
-    console.log('API Response:', response.data);
-    return response.data;
+    if (signal?.aborted) throw new Error('Sync aborted');
+    
+    console.log(`Fetching players${cursor ? ` with cursor ${cursor}` : ''}...`);
+
+    // Use the dedicated active players endpoint
+    const url = cursor 
+      ? `/players/active?per_page=${per_page}&cursor=${cursor}`
+      : `/players/active?per_page=${per_page}`;
+      
+    const response = await api.get(url);
+    
+    if (!response.data || !response.data.data) {
+      console.log('No players found in response');
+      return { data: [], meta: response.data?.meta };
+    }
+
+    const players = response.data.data;
+    console.log(
+      `Found ${players.length} active players ` +
+      `(next_cursor: ${response.data.meta?.next_cursor || 'none'})`
+    );
+
+    return {
+      data: players,
+      meta: response.data.meta || undefined
+    };
   } catch (error) {
+    if (error instanceof Error && error.message === 'Sync aborted') {
+      throw error; // Re-throw abort errors
+    }
     console.error('Error fetching players:', error);
     return { data: [] };
   }
