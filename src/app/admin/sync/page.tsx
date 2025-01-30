@@ -21,7 +21,7 @@ export default function SyncPage() {
       const data = await response.json();
       setStatus(data);
     } catch (err) {
-      setError('Failed to fetch sync status');
+      setError(err instanceof Error ? err.message : 'Failed to fetch sync status');
     }
   };
 

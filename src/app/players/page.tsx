@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import { PlayerWithStats } from '@/types/player';
 import { PlayerTable, columns } from '@/components/PlayerTable';
@@ -179,13 +179,21 @@ export default function PlayersPage() {
   }, [page, sortColumn, sortDirection]);
 
   // Create a debounced version of fetchPlayers
-  const debouncedFetch = useCallback(
-    debounce((search: string) => {
-      setPage(0); // Reset page when searching
-      fetchPlayers(search);
-    }, 500),
+  const debouncedFetch = useMemo(
+    () =>
+      debounce((search: string) => {
+        setPage(0); // Reset page when searching
+        fetchPlayers(search);
+      }, 500),
     [fetchPlayers]
   );
+
+  // Cleanup debounce on unmount
+  useEffect(() => {
+    return () => {
+      debouncedFetch.cancel();
+    };
+  }, [debouncedFetch]);
 
   // Create intersection observer
   useEffect(() => {

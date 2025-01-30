@@ -16,13 +16,13 @@ export async function GET() {
         if (isConnected) {
           try {
             controller.enqueue(encoder.encode('event: ping\ndata: ping\n\n'));
-          } catch (error) {
+          } catch (_) {
             console.error('Error sending ping, closing connection');
             clearInterval(keepAlive);
             isConnected = false;
             try {
               controller.close();
-            } catch (closeError) {
+            } catch (_) {
               // Ignore close errors
             }
           }
