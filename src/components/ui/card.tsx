@@ -14,4 +14,6 @@ export const Card = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
       />
     );
   }
-); 
+);
+
+Card.displayName = 'Card'; 

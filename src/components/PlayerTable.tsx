@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { PlayerWithStats } from '@/types/player';
 
 interface PlayerTableProps {

@@ -20,80 +20,6 @@ export default function PlayersPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const loadingRef = useRef<HTMLDivElement>(null);
 
-  // Create intersection observer
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loading && !searchTerm) {
-          setPage(prev => prev + 1);
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    if (loadingRef.current) {
-      observer.observe(loadingRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, [hasMore, loading, searchTerm]);
-
-  // Create a debounced version of fetchPlayers
-  const debouncedFetch = useCallback(
-    debounce((search: string) => {
-      setPage(0); // Reset page when searching
-      fetchPlayers(search);
-    }, 500),
-    []
-  );
-
-  // Update search term and trigger debounced fetch
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setSearchTerm(value);
-    debouncedFetch(value);
-  };
-
-  const handleSortChange = (column: ColumnKey, direction: 'asc' | 'desc') => {
-    setSortColumn(column);
-    setSortDirection(direction);
-    setPage(0); // Reset to first page
-    setPlayers([]); // Clear current players
-  };
-
-  const fetchPlayerStats = async (players: PlayerWithStats[]) => {
-    const playersWithStats = await Promise.all(
-      players.map(async (player) => {
-        try {
-          // Get player stats - remove single() to handle no stats case
-          const statsResponse = await supabase
-            .from('player_stats')
-            .select('*')
-            .eq('player_id', player.id)
-            .order('season', { ascending: false })
-            .limit(1);
-
-          // Get team info
-          const teamResponse = await supabase
-            .from('teams')
-            .select('*')
-            .eq('id', player.team_id)
-            .single();
-
-          return {
-            ...player,
-            team: teamResponse.data || player.team,
-            stats: statsResponse.data?.[0] || undefined
-          } as PlayerWithStats;
-        } catch (error) {
-          console.error(`Error fetching data for player ${player.id}:`, error);
-          return { ...player, stats: undefined } as PlayerWithStats;
-        }
-      })
-    );
-    return playersWithStats;
-  };
-
   const fetchPlayers = useCallback(async (search?: string) => {
     try {
       setLoading(true);
@@ -251,6 +177,80 @@ export default function PlayersPage() {
       setLoading(false);
     }
   }, [page, sortColumn, sortDirection]);
+
+  // Create a debounced version of fetchPlayers
+  const debouncedFetch = useCallback(
+    debounce((search: string) => {
+      setPage(0); // Reset page when searching
+      fetchPlayers(search);
+    }, 500),
+    [fetchPlayers]
+  );
+
+  // Create intersection observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loading && !searchTerm) {
+          setPage(prev => prev + 1);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (loadingRef.current) {
+      observer.observe(loadingRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [hasMore, loading, searchTerm]);
+
+  // Update search term and trigger debounced fetch
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    debouncedFetch(value);
+  };
+
+  const handleSortChange = (column: ColumnKey, direction: 'asc' | 'desc') => {
+    setSortColumn(column);
+    setSortDirection(direction);
+    setPage(0); // Reset to first page
+    setPlayers([]); // Clear current players
+  };
+
+  const fetchPlayerStats = async (players: PlayerWithStats[]) => {
+    const playersWithStats = await Promise.all(
+      players.map(async (player) => {
+        try {
+          // Get player stats - remove single() to handle no stats case
+          const statsResponse = await supabase
+            .from('player_stats')
+            .select('*')
+            .eq('player_id', player.id)
+            .order('season', { ascending: false })
+            .limit(1);
+
+          // Get team info
+          const teamResponse = await supabase
+            .from('teams')
+            .select('*')
+            .eq('id', player.team_id)
+            .single();
+
+          return {
+            ...player,
+            team: teamResponse.data || player.team,
+            stats: statsResponse.data?.[0] || undefined
+          } as PlayerWithStats;
+        } catch (error) {
+          console.error(`Error fetching data for player ${player.id}:`, error);
+          return { ...player, stats: undefined } as PlayerWithStats;
+        }
+      })
+    );
+    return playersWithStats;
+  };
 
   useEffect(() => {
     fetchPlayers();
