@@ -1,51 +1,248 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { Player, PlayerStats, getPlayers, searchPlayers, getPlayerStats } from '@/lib/balldontlie/api';
-
-interface PlayerWithStats extends Player {
-  stats?: PlayerStats;
-}
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { supabase } from '@/lib/supabase/client';
+import { PlayerWithStats } from '@/types/player';
+import { PlayerTable, columns } from '@/components/PlayerTable';
+import type { ColumnKey } from '@/components/PlayerTable';
+import { debounce } from 'lodash';
 
 export default function PlayersPage() {
+  const PLAYERS_PER_PAGE = 20;
   const [players, setPlayers] = useState<PlayerWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showPlayersWithoutStats, setShowPlayersWithoutStats] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [sortColumn, setSortColumn] = useState<ColumnKey>('fpts');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const loadingRef = useRef<HTMLDivElement>(null);
 
-  const fetchPlayerStats = async (players: Player[]) => {
+  // Create intersection observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loading && !searchTerm) {
+          setPage(prev => prev + 1);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (loadingRef.current) {
+      observer.observe(loadingRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [hasMore, loading, searchTerm]);
+
+  // Create a debounced version of fetchPlayers
+  const debouncedFetch = useCallback(
+    debounce((search: string) => {
+      setPage(0); // Reset page when searching
+      fetchPlayers(search);
+    }, 500),
+    []
+  );
+
+  // Update search term and trigger debounced fetch
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    debouncedFetch(value);
+  };
+
+  const handleSortChange = (column: ColumnKey, direction: 'asc' | 'desc') => {
+    setSortColumn(column);
+    setSortDirection(direction);
+    setPage(0); // Reset to first page
+    setPlayers([]); // Clear current players
+  };
+
+  const fetchPlayerStats = async (players: PlayerWithStats[]) => {
     const playersWithStats = await Promise.all(
       players.map(async (player) => {
         try {
-          const statsResponse = await getPlayerStats(player.id);
-          const latestStats = statsResponse.data[0];
+          // Get player stats - remove single() to handle no stats case
+          const statsResponse = await supabase
+            .from('player_stats')
+            .select('*')
+            .eq('player_id', player.id)
+            .order('season', { ascending: false })
+            .limit(1);
+
+          // Get team info
+          const teamResponse = await supabase
+            .from('teams')
+            .select('*')
+            .eq('id', player.team_id)
+            .single();
+
           return {
             ...player,
-            stats: latestStats || undefined
+            team: teamResponse.data || player.team,
+            stats: statsResponse.data?.[0] || undefined
           } as PlayerWithStats;
         } catch (error) {
-          console.error(`Error fetching stats for player ${player.id}:`, error);
+          console.error(`Error fetching data for player ${player.id}:`, error);
           return { ...player, stats: undefined } as PlayerWithStats;
         }
       })
     );
-    return playersWithStats.filter(player => player.stats);
+    return playersWithStats;
   };
 
   const fetchPlayers = useCallback(async (search?: string) => {
     try {
       setLoading(true);
       const normalizedSearch = search?.trim().toLowerCase();
-      const response = normalizedSearch 
-        ? await searchPlayers(normalizedSearch)
-        : await getPlayers(1, 25);
+      const offset = page * PLAYERS_PER_PAGE;
+      
+      if (normalizedSearch) {
+        // Search by name
+        const response = await supabase
+          .from('players')
+          .select('*')
+          .or(`first_name.ilike.%${normalizedSearch}%,last_name.ilike.%${normalizedSearch}%`)
+          .range(offset, offset + PLAYERS_PER_PAGE + 4);
 
-      if (response.data) {
-        const activePlayers = await fetchPlayerStats(response.data);
-        setPlayers(activePlayers);
-        setError(null);
+        if (response.error) throw response.error;
+        if (response.data) {
+          const playersWithStats = await fetchPlayerStats(response.data);
+          setPlayers(prev => {
+            if (page === 0) return playersWithStats;
+            const existingIds = new Set(prev.map(p => p.id));
+            const newPlayers = playersWithStats.filter(p => !existingIds.has(p.id));
+            return [...prev, ...newPlayers];
+          });
+          setHasMore(response.data.length === PLAYERS_PER_PAGE);
+          setError(null);
+        }
       } else {
-        setError('No data received from API');
+        // Get players sorted by selected column
+        const column = columns.find(col => col.key === sortColumn);
+        // Determine if it's a text column based on the column key
+        const isTextColumn = column?.key === 'last_name' || 
+                           column?.key === 'position' || 
+                           column?.key === 'team_id' || 
+                           column?.key === 'first_name';
+
+        if (isTextColumn) {
+          // Handle text-based sorting at the database level
+          const { data: playersData, error: playersError } = await supabase
+            .from('players')
+            .select('*')
+            .order(sortColumn, { ascending: sortDirection === 'asc' })
+            .range(offset, offset + PLAYERS_PER_PAGE - 1);
+
+          if (playersError) throw playersError;
+          if (playersData) {
+            const playersWithStats = await fetchPlayerStats(playersData);
+            setPlayers(prev => {
+              if (page === 0) return playersWithStats;
+              const existingIds = new Set(prev.map(p => p.id));
+              const newPlayers = playersWithStats.filter(p => !existingIds.has(p.id));
+              return [...prev, ...newPlayers];
+            });
+            setHasMore(playersData.length === PLAYERS_PER_PAGE);
+            setError(null);
+          }
+        } else {
+          // Handle numeric stats-based sorting
+          if (sortColumn === 'fpts' || sortColumn === 'minutes') {
+            // First, get all player IDs in the correct order
+            const { data: allStatsData, error: statsError } = await supabase
+              .from('player_stats')
+              .select('player_id, pts, fg3m, reb, ast, stl, blk, turnover, minutes');
+
+            if (statsError) throw statsError;
+            if (!allStatsData?.length) {
+              setHasMore(false);
+              return;
+            }
+
+            // Sort all stats and get ordered IDs
+            const orderedPlayerIds = allStatsData
+              .map(stat => ({
+                id: stat.player_id,
+                value: sortColumn === 'fpts'
+                  ? stat.pts +
+                    (stat.fg3m || 0) * 0.5 +
+                    stat.reb * 1.25 +
+                    stat.ast * 1.5 +
+                    stat.stl * 2 +
+                    stat.blk * 2 -
+                    (stat.turnover || 0) * 0.5
+                  : (() => {
+                      const [mins, secs] = (stat.minutes || '0:0').split(':').map(Number);
+                      return mins * 60 + (secs || 0);
+                    })()
+              }))
+              .sort((a, b) => sortDirection === 'asc' ? a.value - b.value : b.value - a.value)
+              .map(item => item.id);
+
+            // Get the paginated slice of player IDs
+            const paginatedIds = orderedPlayerIds.slice(offset, offset + PLAYERS_PER_PAGE);
+
+            // Fetch the players for this page
+            const { data: playersData, error: playersError } = await supabase
+              .from('players')
+              .select('*')
+              .in('id', paginatedIds);
+
+            if (playersError) throw playersError;
+            if (playersData) {
+              // Sort players to match the stats order
+              const sortedPlayers = paginatedIds
+                .map(id => playersData.find(p => p.id === id))
+                .filter((p): p is NonNullable<typeof p> => p != null);
+
+              const playersWithStats = await fetchPlayerStats(sortedPlayers);
+              setPlayers(prev => {
+                if (page === 0) return playersWithStats;
+                const existingIds = new Set(prev.map(p => p.id));
+                const newPlayers = playersWithStats.filter(p => !existingIds.has(p.id));
+                return [...prev, ...newPlayers];
+              });
+              setHasMore(offset + PLAYERS_PER_PAGE < orderedPlayerIds.length);
+              setError(null);
+            }
+          } else {
+            // Handle other numeric stats normally
+            const { data: statsData, error: statsError } = await supabase
+              .from('player_stats')
+              .select('player_id')
+              .order(sortColumn, { ascending: sortDirection === 'asc' })
+              .range(offset, offset + PLAYERS_PER_PAGE - 1);
+
+            if (statsError) throw statsError;
+            if (!statsData?.length) {
+              setHasMore(false);
+              return;
+            }
+
+            const playerIds = statsData.map(stat => stat.player_id);
+            const { data: playersData, error: playersError } = await supabase
+              .from('players')
+              .select('*')
+              .in('id', playerIds);
+
+            if (playersError) throw playersError;
+            if (playersData) {
+              const playersWithStats = await fetchPlayerStats(playersData);
+              setPlayers(prev => {
+                if (page === 0) return playersWithStats;
+                const existingIds = new Set(prev.map(p => p.id));
+                const newPlayers = playersWithStats.filter(p => !existingIds.has(p.id));
+                return [...prev, ...newPlayers];
+              });
+              setHasMore(statsData.length === PLAYERS_PER_PAGE);
+              setError(null);
+            }
+          }
+        }
       }
     } catch (error) {
       console.error('Error in component:', error);
@@ -53,82 +250,72 @@ export default function PlayersPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, sortColumn, sortDirection]);
 
   useEffect(() => {
     fetchPlayers();
-  }, [fetchPlayers]);
-
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await fetchPlayers(searchTerm);
-  };
+  }, [fetchPlayers, page]);
 
   return (
-    <div className="p-8">
-      <div className="mb-8">
+    <div className="flex flex-col h-[calc(100vh-2rem)] p-8">
+      <div className="flex-none mb-8">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Players</h1>
         <p className="text-gray-500 dark:text-gray-400">Search and view NBA player statistics</p>
       </div>
 
-      <form onSubmit={handleSearch} className="mb-8">
-        <div className="flex gap-2 max-w-md">
+      <div className="flex-none flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-8">
+        <div className="flex-1 max-w-md">
           <input
             type="text"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search active players..."
-            className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+            onChange={handleSearchChange}
+            placeholder="Search players..."
+            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
           />
-          <button
-            type="submit"
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600"
+        </div>
+
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="showPlayersWithoutStats"
+            checked={showPlayersWithoutStats}
+            onChange={(e) => setShowPlayersWithoutStats(e.target.checked)}
+            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 dark:bg-gray-700 dark:border-gray-600"
+          />
+          <label
+            htmlFor="showPlayersWithoutStats"
+            className="text-sm text-gray-700 dark:text-gray-300"
           >
-            Search
-          </button>
+            Show players without stats
+          </label>
         </div>
-      </form>
-      
-      {loading ? (
-        <div className="flex justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-        </div>
-      ) : error ? (
+      </div>
+
+      {error ? (
         <div className="bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded">
           <p>{error}</p>
         </div>
-      ) : players.length === 0 ? (
+      ) : players.length === 0 && !loading ? (
         <div className="text-center text-gray-600 dark:text-gray-400">
-          <p>No active players found. Try a different search term.</p>
+          <p>No players found. Try a different search term.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {players.map((player) => (
-            <div
-              key={player.id}
-              className="bg-white dark:bg-gray-800 shadow-lg rounded-lg p-6 hover:shadow-xl transition-shadow cursor-pointer"
-            >
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                {player.first_name} {player.last_name}
-              </h2>
-              <p className="text-gray-600 dark:text-gray-400">{player.position}</p>
-              <p className="text-gray-600 dark:text-gray-400">
-                {player.team.city} {player.team.name}
-              </p>
-              {player.stats && (
-                <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                  <div className="grid grid-cols-2 gap-x-4">
-                    <p>PPG: {player.stats.pts.toFixed(1)}</p>
-                    <p>RPG: {player.stats.reb.toFixed(1)}</p>
-                    <p>APG: {player.stats.ast.toFixed(1)}</p>
-                    <p>Games: {player.stats.games_played}</p>
-                    <p>FG%: {(player.stats.fg_pct * 100).toFixed(1)}%</p>
-                    <p>3P%: {(player.stats.fg3_pct * 100).toFixed(1)}%</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
+        <div className="min-h-0 flex-1">
+          <PlayerTable 
+            players={players} 
+            className="bg-white dark:bg-gray-800 rounded-lg shadow"
+            showPlayersWithoutStats={showPlayersWithoutStats}
+            onSortChange={handleSortChange}
+            sortColumn={sortColumn}
+            sortDirection={sortDirection}
+          />
+          <div ref={loadingRef} className="mt-4 pb-4">
+            {loading && (
+              <div className="flex justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
