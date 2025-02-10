@@ -151,44 +151,49 @@ export default function ProfilePage() {
       
       if (!user) throw new Error('No user logged in');
 
-      // Create a unique file name
-      const fileExt = file.name.split('.').pop();
-      const fileName = `public/${user.id}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      // Use a consistent filename with jpg extension
+      const filePath = `public/${user.id}.jpg`;
 
-      // Upload the file to Supabase storage
+      // First, try to delete the existing file
+      const { error: deleteError } = await supabase.storage
+        .from('profile_pictures')
+        .remove([filePath]);
+
+      if (deleteError) {
+        console.error('Error deleting existing profile picture:', deleteError);
+      }
+
+      // Wait a moment to ensure deletion is processed
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Upload the new file
       const { error: uploadError } = await supabase.storage
         .from('profile_pictures')
-        .upload(fileName, file, {
-          cacheControl: '3600',
+        .upload(filePath, file, {
+          cacheControl: 'no-cache',
+          contentType: 'image/jpeg',
           upsert: true
         });
 
       if (uploadError) throw uploadError;
 
-      // Get the public URL
+      // Add a timestamp to the URL to prevent caching
+      const timestamp = Date.now();
       const { data: { publicUrl } } = supabase.storage
         .from('profile_pictures')
-        .getPublicUrl(fileName);
+        .getPublicUrl(filePath);
 
-      // Delete old profile picture if it exists
-      if (profile?.avatar_url) {
-        const oldFileName = profile.avatar_url.split('/').pop();
-        if (oldFileName) {
-          await supabase.storage
-            .from('profile_pictures')
-            .remove([`public/${oldFileName}`]);
-        }
-      }
+      const urlWithTimestamp = `${publicUrl}?v=${timestamp}`;
 
       // Update the profile with the new avatar URL
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({ avatar_url: publicUrl })
+        .update({ avatar_url: urlWithTimestamp })
         .eq('id', user.id);
 
       if (updateError) throw updateError;
 
-      setProfile(prev => prev ? { ...prev, avatar_url: publicUrl } : null);
+      setProfile(prev => prev ? { ...prev, avatar_url: urlWithTimestamp } : null);
       addToast('Profile photo updated successfully');
     } catch (error) {
       console.error('Error updating profile photo:', error);
