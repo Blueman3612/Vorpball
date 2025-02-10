@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import Sidebar from "@/components/layout/Sidebar";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider } from "@/contexts/AuthContext";
 
@@ -34,17 +33,10 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={`${inter.className} dark:bg-gray-900`}>
+      <body className={inter.className}>
         <AuthProvider>
           <ThemeProvider>
-            <div className="flex h-screen overflow-hidden">
-              <aside className="w-64 hidden md:block">
-                <Sidebar />
-              </aside>
-              <main className="flex-1 overflow-y-auto bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-800">
-                {children}
-              </main>
-            </div>
+            {children}
           </ThemeProvider>
         </AuthProvider>
       </body>

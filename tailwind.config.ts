@@ -23,11 +23,23 @@ const config: Config = {
             opacity: '1',
             transform: 'translateY(0) scale(1)'
           }
-        }
+        },
+        'gradient': {
+          '0%, 100%': {
+            'background-position': '0% 50%',
+          },
+          '50%': {
+            'background-position': '100% 50%',
+          },
+        },
       },
       animation: {
-        'enter-toast': 'enter-toast 0.2s ease-out'
-      }
+        'enter-toast': 'enter-toast 0.2s ease-out',
+        'gradient-slow': 'gradient 15s ease infinite',
+      },
+      backgroundSize: {
+        'gradient-size': '400% 400%',
+      },
     },
   },
   plugins: [],
