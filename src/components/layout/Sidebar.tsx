@@ -9,7 +9,6 @@ import {
   UsersIcon, 
   ChartBarIcon, 
   TrophyIcon,
-  UserCircleIcon,
   TableCellsIcon
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
@@ -32,7 +31,7 @@ const navigation = [
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, signOut, loading } = useAuth();
+  const { user, loading } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
 
   useEffect(() => {
@@ -60,15 +59,6 @@ export default function Sidebar() {
 
     getProfile();
   }, [user, loading, router]);
-
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      router.push('/auth/signin');
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
-  };
 
   if (loading || !user) {
     return null;

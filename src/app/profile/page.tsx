@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Toggle } from '@/components/ui/toggle';
 import { addToast, ToastContainer } from '@/components/ui/toast';
@@ -152,7 +153,7 @@ export default function ProfilePage() {
       const fileName = `public/${user.id}-${Math.random().toString(36).substring(2)}.${fileExt}`;
 
       // Upload the file to Supabase storage
-      const { error: uploadError, data } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('profile_pictures')
         .upload(fileName, file, {
           cacheControl: '3600',
@@ -238,11 +239,14 @@ export default function ProfilePage() {
                   </div>
                 ) : null}
                 {getValue('avatar_url') ? (
-                  <img 
-                    src={getValue('avatar_url') || ''} 
-                    alt={getValue('full_name') || 'Profile'} 
-                    className="h-20 w-20 rounded-full object-cover" 
-                  />
+                  <div className="relative h-20 w-20">
+                    <Image
+                      src={getValue('avatar_url') || ''}
+                      alt={getValue('full_name') || 'Profile'}
+                      fill
+                      className="rounded-full object-cover"
+                    />
+                  </div>
                 ) : (
                   <span className="text-2xl text-gray-500 dark:text-gray-400">
                     {getValue('full_name')?.charAt(0) || 'U'}

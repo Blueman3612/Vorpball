@@ -11,7 +11,6 @@ interface Toast {
 interface ToastProps {
   message: string;
   type: 'success' | 'error';
-  onClose: () => void;
 }
 
 let toastCount = 0;
@@ -32,7 +31,7 @@ export function addToast(message: string, type: 'success' | 'error' = 'success')
   }, 3000);
 }
 
-function Toast({ message, type, onClose }: ToastProps) {
+function Toast({ message, type }: ToastProps) {
   return (
     <div
       className={clsx(
@@ -94,13 +93,6 @@ export function ToastContainer() {
           key={toast.id}
           message={toast.message}
           type={toast.type}
-          onClose={() => {
-            const index = toasts.findIndex(t => t.id === toast.id);
-            if (index > -1) {
-              toasts.splice(index, 1);
-              listeners.forEach(listener => listener([...toasts]));
-            }
-          }}
         />
       ))}
     </div>,
