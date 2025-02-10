@@ -35,6 +35,7 @@ export function LanguageSelector({ currentLanguage }: LanguageSelectorProps) {
               src={selectedLanguage.flag}
               alt={selectedLanguage.name}
               fill
+              sizes="20px"
               className="object-cover"
             />
           </div>

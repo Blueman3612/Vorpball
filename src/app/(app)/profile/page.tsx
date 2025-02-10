@@ -252,6 +252,8 @@ export default function ProfilePage() {
                       src={getValue('avatar_url') || ''}
                       alt={getValue('full_name') || t('profile.title')}
                       fill
+                      sizes="80px"
+                      priority
                       className="rounded-full object-cover"
                     />
                   </div>
