@@ -404,7 +404,6 @@ export default function ProfilePage() {
               <div className="w-48">
                 <LanguageSelector
                   currentLanguage="en"
-                  onLanguageChange={() => {}}
                 />
               </div>
             </div>
