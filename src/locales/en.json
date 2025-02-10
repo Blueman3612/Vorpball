@@ -1,0 +1,147 @@
+{
+  "common": {
+    "actions": {
+      "save": "Save",
+      "cancel": "Cancel",
+      "create": "Create",
+      "edit": "Edit",
+      "delete": "Delete",
+      "saveAsDraft": "Save as Draft",
+      "signOut": "Sign out",
+      "upload": "Upload",
+      "saveChanges": "Save Changes",
+      "savingChanges": "Saving Changes..."
+    },
+    "navigation": {
+      "league": "League",
+      "myTeams": "My Teams",
+      "players": "Players",
+      "statsAndAnalysis": "Stats & Analysis",
+      "viewProfile": "View profile"
+    },
+    "states": {
+      "loading": "Loading...",
+      "saving": "Saving...",
+      "uploading": "Uploading..."
+    },
+    "errors": {
+      "notFound": "Not found",
+      "generic": "Something went wrong",
+      "noProfile": "No profile found",
+      "saveFailed": "Failed to save changes",
+      "updateFailed": "Failed to update preference",
+      "photoUpdateFailed": "Failed to update profile photo",
+      "signOutFailed": "Failed to sign out"
+    },
+    "success": {
+      "changesSaved": "Changes saved successfully",
+      "preferenceUpdated": "Preference updated",
+      "photoUpdated": "Profile photo updated successfully"
+    },
+    "languages": {
+      "title": "Language",
+      "description": "Select your preferred language",
+      "en": "English"
+    }
+  },
+  "auth": {
+    "welcome": "Welcome to VorpBall",
+    "welcomeDescription": "Join the future of fantasy basketball. Sign in to start your journey."
+  },
+  "profile": {
+    "title": "Profile",
+    "sections": {
+      "accountSettings": {
+        "title": "Account Settings",
+        "fields": {
+          "fullName": {
+            "label": "Full Name"
+          },
+          "username": {
+            "label": "Username"
+          },
+          "email": {
+            "label": "Email"
+          }
+        }
+      },
+      "preferences": {
+        "title": "Preferences",
+        "emailNotifications": {
+          "label": "Email Notifications",
+          "description": "Receive email updates about your fantasy teams"
+        },
+        "darkMode": {
+          "label": "Dark Mode",
+          "description": "Toggle between light and dark theme"
+        }
+      },
+      "photo": {
+        "changeLabel": "Change profile photo"
+      }
+    }
+  },
+  "league": {
+    "create": {
+      "title": "Create Your League",
+      "description": "Set up your fantasy basketball league and invite players",
+      "form": {
+        "sections": {
+          "info": {
+            "title": "League Information",
+            "leagueName": {
+              "label": "League Name",
+              "placeholder": "Enter league name"
+            },
+            "description": {
+              "label": "Description",
+              "placeholder": "Describe your league"
+            }
+          },
+          "settings": {
+            "title": "League Settings",
+            "scoringType": {
+              "label": "Scoring Type",
+              "options": {
+                "headToHead": "Head-to-Head",
+                "points": "Points",
+                "roto": "Roto"
+              }
+            },
+            "teams": {
+              "label": "Teams",
+              "teamCount": "{count} Teams"
+            },
+            "draftType": {
+              "label": "Draft Type",
+              "options": {
+                "snake": "Snake",
+                "auction": "Auction",
+                "linear": "Linear"
+              }
+            },
+            "draftDate": {
+              "label": "Draft Date"
+            }
+          },
+          "roster": {
+            "title": "Roster Settings",
+            "defaultSettings": "Default roster settings will be used:",
+            "positions": {
+              "pg": "PG",
+              "sg": "SG",
+              "sf": "SF",
+              "pf": "PF",
+              "c": "C"
+            },
+            "spots": {
+              "bench": "{count} Bench spots",
+              "ir": "{count} IR spots"
+            },
+            "customize": "Customize Roster Settings"
+          }
+        }
+      }
+    }
+  }
+} 

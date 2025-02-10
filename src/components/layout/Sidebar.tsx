@@ -13,6 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase/client';
+import { useTranslations, MessageKeys } from '@/lib/i18n';
 
 interface Profile {
   username: string | null;
@@ -20,12 +21,17 @@ interface Profile {
   avatar_url: string | null;
 }
 
-const navigation = [
-  { name: 'Dashboard', href: '/', icon: HomeIcon },
-  { name: 'My Teams', href: '/teams', icon: UsersIcon },
-  { name: 'Players', href: '/players', icon: TableCellsIcon },
-  { name: 'League', href: '/league', icon: TrophyIcon },
-  { name: 'Stats & Analysis', href: '/stats', icon: ChartBarIcon },
+interface NavigationItem {
+  name: MessageKeys;
+  href: string;
+  icon: React.ForwardRefExoticComponent<React.SVGProps<SVGSVGElement>>;
+}
+
+const navigation: NavigationItem[] = [
+  { name: 'common.navigation.league', href: '/league', icon: TrophyIcon },
+  { name: 'common.navigation.myTeams', href: '/teams', icon: UsersIcon },
+  { name: 'common.navigation.players', href: '/players', icon: TableCellsIcon },
+  { name: 'common.navigation.statsAndAnalysis', href: '/stats', icon: ChartBarIcon },
 ];
 
 export default function Sidebar() {
@@ -33,6 +39,7 @@ export default function Sidebar() {
   const router = useRouter();
   const { user, loading } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
+  const { t } = useTranslations();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -91,7 +98,7 @@ export default function Sidebar() {
                     `}
                   >
                     <item.icon className="h-6 w-6 shrink-0" aria-hidden="true" />
-                    {item.name}
+                    {t(item.name)}
                   </Link>
                 </li>
               );
@@ -109,7 +116,7 @@ export default function Sidebar() {
             {profile?.avatar_url ? (
               <Image
                 src={profile.avatar_url}
-                alt={profile.full_name || 'Profile'}
+                alt={profile.full_name || t('common.navigation.viewProfile')}
                 fill
                 className="rounded-full object-cover"
               />
@@ -126,7 +133,7 @@ export default function Sidebar() {
               {profile?.username || 'User'}
             </p>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              View profile
+              {t('common.navigation.viewProfile')}
             </p>
           </div>
         </Link>

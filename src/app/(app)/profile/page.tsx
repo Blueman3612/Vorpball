@@ -10,6 +10,8 @@ import { addToast, ToastContainer } from '@/components/ui/toast';
 import { useTheme } from '@/components/ThemeProvider';
 import { PencilIcon } from '@heroicons/react/24/solid';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTranslations } from '@/lib/i18n';
+import { LanguageSelector } from '@/components/LanguageSelector';
 
 interface Profile {
   id: string;
@@ -33,6 +35,7 @@ export default function ProfilePage() {
   const [hasChanges, setHasChanges] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { t } = useTranslations();
 
   const getProfile = useCallback(async () => {
     try {
@@ -209,11 +212,11 @@ export default function ProfilePage() {
   };
 
   if (loading) {
-    return <div className="p-8">Loading...</div>;
+    return <div className="p-8">{t('common.states.loading')}</div>;
   }
 
   if (!profile) {
-    return <div className="p-8">No profile found.</div>;
+    return <div className="p-8">{t('common.errors.noProfile')}</div>;
   }
 
   return (
@@ -242,7 +245,7 @@ export default function ProfilePage() {
                   <div className="relative h-20 w-20">
                     <Image
                       src={getValue('avatar_url') || ''}
-                      alt={getValue('full_name') || 'Profile'}
+                      alt={getValue('full_name') || t('profile.title')}
                       fill
                       className="rounded-full object-cover"
                     />
@@ -257,7 +260,7 @@ export default function ProfilePage() {
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploadingPhoto}
                 className="absolute bottom-0 right-0 p-1.5 rounded-full bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                aria-label="Change profile photo"
+                aria-label={t('profile.sections.photo.changeLabel')}
               >
                 <PencilIcon className="h-3.5 w-3.5 text-gray-600 dark:text-gray-300" />
               </button>
@@ -272,7 +275,7 @@ export default function ProfilePage() {
             variant="outline"
             size="sm"
           >
-            Sign out
+            {t('common.actions.signOut')}
           </Button>
         </div>
       </div>
@@ -282,13 +285,15 @@ export default function ProfilePage() {
         {/* Account Settings */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden h-fit">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Account Settings</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {t('profile.sections.accountSettings.title')}
+            </h3>
           </div>
           <div className="p-6 space-y-6">
             {/* Name */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Full Name
+                {t('profile.sections.accountSettings.fields.fullName.label')}
               </label>
               <input
                 type="text"
@@ -301,7 +306,7 @@ export default function ProfilePage() {
             {/* Username */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Username
+                {t('profile.sections.accountSettings.fields.username.label')}
               </label>
               <input
                 type="text"
@@ -314,7 +319,7 @@ export default function ProfilePage() {
             {/* Email */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Email
+                {t('profile.sections.accountSettings.fields.email.label')}
               </label>
               <input
                 type="email"
@@ -331,7 +336,7 @@ export default function ProfilePage() {
                   onClick={handleCancel}
                   variant="outline"
                 >
-                  Cancel
+                  {t('common.actions.cancel')}
                 </Button>
                 <Button
                   onClick={saveChanges}
@@ -339,7 +344,7 @@ export default function ProfilePage() {
                   isLoading={saving}
                   variant="primary"
                 >
-                  {saving ? 'Saving Changes...' : 'Save Changes'}
+                  {saving ? t('common.actions.savingChanges') : t('common.actions.saveChanges')}
                 </Button>
               </div>
             )}
@@ -349,15 +354,19 @@ export default function ProfilePage() {
         {/* Preferences */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden h-fit">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Preferences</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {t('profile.sections.preferences.title')}
+            </h3>
           </div>
           <div className="p-6 space-y-6">
             {/* Email Notifications */}
             <div className="flex items-center justify-between">
               <div>
-                <h4 className="text-sm font-medium text-gray-900 dark:text-white">Email Notifications</h4>
+                <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                  {t('profile.sections.preferences.emailNotifications.label')}
+                </h4>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Receive email updates about your fantasy teams
+                  {t('profile.sections.preferences.emailNotifications.description')}
                 </p>
               </div>
               <Toggle
@@ -369,15 +378,35 @@ export default function ProfilePage() {
             {/* Dark Mode */}
             <div className="flex items-center justify-between">
               <div>
-                <h4 className="text-sm font-medium text-gray-900 dark:text-white">Dark Mode</h4>
+                <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                  {t('profile.sections.preferences.darkMode.label')}
+                </h4>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Toggle between light and dark theme
+                  {t('profile.sections.preferences.darkMode.description')}
                 </p>
               </div>
               <Toggle
                 checked={theme === 'dark'}
                 onChange={(checked) => updatePreference('dark_mode', checked)}
               />
+            </div>
+
+            {/* Language Selector */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                  {t('common.languages.title')}
+                </h4>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {t('common.languages.description')}
+                </p>
+              </div>
+              <div className="w-48">
+                <LanguageSelector
+                  currentLanguage="en"
+                  onLanguageChange={() => {}}
+                />
+              </div>
             </div>
           </div>
         </div>

@@ -4,9 +4,11 @@ import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { supabase } from '@/lib/supabase/client';
 import { useTheme } from '@/components/ThemeProvider';
+import { useTranslations } from '@/lib/i18n';
 
 export default function SignIn() {
   const { theme } = useTheme();
+  const { t } = useTranslations();
 
   return (
     <div className="relative min-h-screen flex items-center justify-center overflow-hidden">
@@ -21,10 +23,10 @@ export default function SignIn() {
               <span className="text-2xl font-bold text-white">V</span>
             </div>
             <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
-              Welcome to VorpBall
+              {t('auth.welcome')}
             </h2>
             <p className="mt-3 text-base text-gray-500 dark:text-gray-400 max-w-sm mx-auto">
-              Join the future of fantasy basketball. Sign in to start your journey.
+              {t('auth.welcomeDescription')}
             </p>
           </div>
 
