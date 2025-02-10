@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { 
   HomeIcon, 
   UsersIcon, 
@@ -12,8 +12,14 @@ import {
   UserCircleIcon,
   TableCellsIcon
 } from '@heroicons/react/24/outline';
-import ThemeToggle from '../ThemeToggle';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase/client';
+
+interface Profile {
+  username: string | null;
+  full_name: string | null;
+  avatar_url: string | null;
+}
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: HomeIcon },
@@ -21,18 +27,38 @@ const navigation = [
   { name: 'Players', href: '/players', icon: TableCellsIcon },
   { name: 'League', href: '/league', icon: TrophyIcon },
   { name: 'Stats & Analysis', href: '/stats', icon: ChartBarIcon },
-  { name: 'Profile', href: '/profile', icon: UserCircleIcon },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, signOut, loading } = useAuth();
+  const [profile, setProfile] = useState<Profile | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
       router.push('/auth/signin');
+      return;
     }
+
+    async function getProfile() {
+      if (!user) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('username, full_name, avatar_url')
+          .eq('id', user.id)
+          .single();
+
+        if (error) throw error;
+        setProfile(data);
+      } catch (error) {
+        console.error('Error loading profile:', error);
+      }
+    }
+
+    getProfile();
   }, [user, loading, router]);
 
   const handleSignOut = async () => {
@@ -56,7 +82,6 @@ export default function Sidebar() {
             <span className="h-10 w-10 rounded-lg bg-blue-600" />
             <span className="text-xl font-bold text-gray-900 dark:text-white">Fantasy Basketball</span>
           </Link>
-          <ThemeToggle />
         </div>
 
         <nav className="flex flex-1 flex-col">
@@ -86,20 +111,35 @@ export default function Sidebar() {
       </div>
 
       <div className="sticky inset-x-0 bottom-0 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
-        <div className="flex items-center gap-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg p-2" onClick={handleSignOut}>
-          <div className="relative h-10 w-10">
-            <Image
-              alt="User"
-              src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
-              fill
-              className="rounded-full object-cover"
-            />
+        <Link
+          href="/profile"
+          className="flex items-center gap-4 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg p-2"
+        >
+          <div className="relative h-10 w-10 flex-shrink-0">
+            {profile?.avatar_url ? (
+              <Image
+                src={profile.avatar_url}
+                alt={profile.full_name || 'Profile'}
+                fill
+                className="rounded-full object-cover"
+              />
+            ) : (
+              <div className="h-10 w-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                <span className="text-lg font-medium text-gray-600 dark:text-gray-400">
+                  {(profile?.full_name || profile?.username || 'U').charAt(0)}
+                </span>
+              </div>
+            )}
           </div>
-          <div>
-            <p className="text-sm font-medium text-gray-900 dark:text-white">{user.email}</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Sign out</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+              {profile?.username || 'User'}
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              View profile
+            </p>
           </div>
-        </div>
+        </Link>
       </div>
     </div>
   );

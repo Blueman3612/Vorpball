@@ -13,6 +13,21 @@ const config: Config = {
         background: "var(--background)",
         foreground: "var(--foreground)",
       },
+      keyframes: {
+        'enter-toast': {
+          '0%': { 
+            opacity: '0',
+            transform: 'translateY(1rem) scale(0.96)'
+          },
+          '100%': { 
+            opacity: '1',
+            transform: 'translateY(0) scale(1)'
+          }
+        }
+      },
+      animation: {
+        'enter-toast': 'enter-toast 0.2s ease-out'
+      }
     },
   },
   plugins: [],
