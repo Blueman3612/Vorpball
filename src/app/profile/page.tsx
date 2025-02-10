@@ -1,25 +1,152 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase/client';
+import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { Toggle } from '@/components/ui/toggle';
+
+interface Profile {
+  id: string;
+  username: string | null;
+  full_name: string | null;
+  avatar_url: string | null;
+  email: string | null;
+  timezone: string | null;
+  email_notifications: boolean;
+  dark_mode: boolean;
+}
+
 export default function ProfilePage() {
+  const router = useRouter();
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [unsavedChanges, setUnsavedChanges] = useState<Partial<Profile>>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+
+  useEffect(() => {
+    getProfile();
+  }, []);
+
+  // Update hasChanges whenever unsavedChanges changes
+  useEffect(() => {
+    setHasChanges(Object.keys(unsavedChanges).length > 0);
+  }, [unsavedChanges]);
+
+  async function getProfile() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        router.push('/login');
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (error) throw error;
+      setProfile(data);
+      setUnsavedChanges({});
+    } catch (error) {
+      console.error('Error loading profile:', error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function saveChanges() {
+    if (!hasChanges) return;
+
+    try {
+      setSaving(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) throw new Error('No user logged in');
+
+      const { error } = await supabase
+        .from('profiles')
+        .update(unsavedChanges)
+        .eq('id', user.id);
+
+      if (error) throw error;
+      
+      setProfile(prev => prev ? { ...prev, ...unsavedChanges } : null);
+      setUnsavedChanges({});
+    } catch (error) {
+      console.error('Error updating profile:', error);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleChange(updates: Partial<Profile>) {
+    setUnsavedChanges(prev => ({ ...prev, ...updates }));
+  }
+
+  // Helper function to get the current value (either unsaved or saved)
+  function getValue<K extends keyof Profile>(key: K): Profile[K] | null {
+    if (key in unsavedChanges) {
+      return unsavedChanges[key] as Profile[K];
+    }
+    return profile?.[key] ?? null;
+  }
+
+  if (loading) {
+    return <div className="p-8">Loading...</div>;
+  }
+
+  if (!profile) {
+    return <div className="p-8">No profile found.</div>;
+  }
+
   return (
     <div className="p-8">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Profile</h1>
-        <p className="text-gray-500 dark:text-gray-400">Manage your account settings and preferences</p>
+      <div className="mb-8 flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Profile</h1>
+          <p className="text-gray-500 dark:text-gray-400">Manage your account settings and preferences</p>
+        </div>
+        <Button
+          onClick={saveChanges}
+          disabled={!hasChanges}
+          isLoading={saving}
+          variant="primary"
+        >
+          Save Changes
+        </Button>
       </div>
 
       {/* Profile Info */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-8">
         <div className="flex items-center mb-6">
           <div className="h-20 w-20 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-            <span className="text-2xl text-gray-500 dark:text-gray-400">JD</span>
+            {getValue('avatar_url') ? (
+              <img 
+                src={getValue('avatar_url') || ''} 
+                alt={getValue('full_name') || 'Profile'} 
+                className="h-20 w-20 rounded-full object-cover" 
+              />
+            ) : (
+              <span className="text-2xl text-gray-500 dark:text-gray-400">
+                {getValue('full_name')?.charAt(0) || 'U'}
+              </span>
+            )}
           </div>
           <div className="ml-6">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">John Doe</h2>
-            <p className="text-gray-500 dark:text-gray-400">john@example.com</p>
-            <button className="mt-2 text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{getValue('full_name')}</h2>
+            <p className="text-gray-500 dark:text-gray-400">{getValue('email')}</p>
+            <Button 
+              variant="secondary"
+              size="sm"
+              onClick={() => {/* TODO: Implement avatar upload */}}
+            >
               Change profile photo
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -33,12 +160,26 @@ export default function ProfilePage() {
           {/* Name */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Name
+              Full Name
             </label>
             <input
               type="text"
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-              defaultValue="John Doe"
+              value={getValue('full_name') || ''}
+              onChange={(e) => handleChange({ full_name: e.target.value })}
+            />
+          </div>
+
+          {/* Username */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Username
+            </label>
+            <input
+              type="text"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+              value={getValue('username') || ''}
+              onChange={(e) => handleChange({ username: e.target.value })}
             />
           </div>
 
@@ -50,7 +191,8 @@ export default function ProfilePage() {
             <input
               type="email"
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-              defaultValue="john@example.com"
+              value={getValue('email') || ''}
+              disabled
             />
           </div>
 
@@ -59,11 +201,16 @@ export default function ProfilePage() {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Time Zone
             </label>
-            <select className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
-              <option>Pacific Time (PT)</option>
-              <option>Mountain Time (MT)</option>
-              <option>Central Time (CT)</option>
-              <option>Eastern Time (ET)</option>
+            <select 
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+              value={getValue('timezone') || 'UTC'}
+              onChange={(e) => handleChange({ timezone: e.target.value })}
+            >
+              <option value="America/Los_Angeles">Pacific Time (PT)</option>
+              <option value="America/Denver">Mountain Time (MT)</option>
+              <option value="America/Chicago">Central Time (CT)</option>
+              <option value="America/New_York">Eastern Time (ET)</option>
+              <option value="UTC">UTC</option>
             </select>
           </div>
         </div>
@@ -83,9 +230,10 @@ export default function ProfilePage() {
                 Receive email updates about your fantasy teams
               </p>
             </div>
-            <button className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-200 dark:bg-gray-700">
-              <span className="translate-x-5 inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out" />
-            </button>
+            <Toggle
+              checked={getValue('email_notifications') || false}
+              onChange={(checked) => handleChange({ email_notifications: checked })}
+            />
           </div>
 
           {/* Dark Mode */}
@@ -96,9 +244,10 @@ export default function ProfilePage() {
                 Toggle between light and dark theme
               </p>
             </div>
-            <button className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 bg-blue-600">
-              <span className="translate-x-5 inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out" />
-            </button>
+            <Toggle
+              checked={getValue('dark_mode') || false}
+              onChange={(checked) => handleChange({ dark_mode: checked })}
+            />
           </div>
         </div>
       </div>
