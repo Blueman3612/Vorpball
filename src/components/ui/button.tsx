@@ -1,8 +1,8 @@
 import { ButtonHTMLAttributes, ReactNode } from 'react';
-import { clsx } from 'clsx';
+import { cn, getThemeColorClass } from '@/lib/utils';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline' | 'destructive';
+  variant?: 'primary' | 'secondary' | 'outline' | 'destructive' | 'affirmative';
   size?: 'sm' | 'md' | 'lg';
   isLoading?: boolean;
   children: ReactNode;
@@ -20,7 +20,7 @@ export function Button({
   return (
     <button
       disabled={isLoading || disabled}
-      className={clsx(
+      className={cn(
         // Base styles
         'rounded-lg font-medium transition-all duration-200 shadow-sm',
         'focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-slate-900',
@@ -33,17 +33,57 @@ export function Button({
         // Color variants
         {
           // Primary
-          'bg-indigo-500 text-white hover:bg-indigo-600 active:bg-indigo-700 focus:ring-indigo-400 disabled:bg-slate-100 disabled:text-slate-400 dark:bg-indigo-600 dark:hover:bg-indigo-500 dark:active:bg-indigo-400 dark:disabled:bg-slate-800 dark:disabled:text-slate-600 shadow-indigo-100 dark:shadow-none':
-            variant === 'primary',
+          [cn(
+            getThemeColorClass('primary', 500, 'bg'),
+            'text-white',
+            `hover:${getThemeColorClass('primary', 600, 'bg')}`,
+            `active:${getThemeColorClass('primary', 700, 'bg')}`,
+            'focus:ring-primary-400',
+            'disabled:bg-slate-100 disabled:text-slate-400',
+            'dark:disabled:bg-slate-800 dark:disabled:text-slate-600',
+            'shadow-primary-100 dark:shadow-none'
+          )]: variant === 'primary',
           // Secondary
-          'bg-slate-100 text-slate-700 hover:bg-slate-200 active:bg-slate-300 focus:ring-slate-300 disabled:bg-slate-50 disabled:text-slate-300 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600 dark:active:bg-slate-500':
-            variant === 'secondary',
+          [cn(
+            getThemeColorClass('gray', 100, 'bg'),
+            getThemeColorClass('gray', 700, 'text'),
+            `hover:${getThemeColorClass('gray', 200, 'bg')}`,
+            `active:${getThemeColorClass('gray', 300, 'bg')}`,
+            'focus:ring-gray-300',
+            'disabled:bg-slate-50 disabled:text-slate-300',
+            'dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600 dark:active:bg-slate-500'
+          )]: variant === 'secondary',
           // Outline
-          'border border-slate-200 bg-transparent text-slate-700 hover:bg-slate-50 active:bg-slate-100 focus:ring-slate-300 disabled:bg-transparent disabled:text-slate-300 disabled:border-slate-200 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700 dark:hover:border-slate-500 dark:active:bg-slate-600':
-            variant === 'outline',
+          [cn(
+            'border border-slate-200 bg-transparent',
+            getThemeColorClass('gray', 700, 'text'),
+            'hover:bg-slate-50 active:bg-slate-100',
+            'focus:ring-slate-300',
+            'disabled:bg-transparent disabled:text-slate-300 disabled:border-slate-200',
+            'dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700 dark:hover:border-slate-500 dark:active:bg-slate-600'
+          )]: variant === 'outline',
           // Destructive
-          'bg-red-500 text-white hover:bg-red-600 active:bg-red-700 focus:ring-red-400 disabled:bg-slate-100 disabled:text-slate-400 dark:bg-red-600 dark:hover:bg-red-500 dark:active:bg-red-400 dark:disabled:bg-slate-800 dark:disabled:text-slate-600 shadow-red-100 dark:shadow-none':
-            variant === 'destructive',
+          [cn(
+            getThemeColorClass('error', 500, 'bg'),
+            'text-white',
+            `hover:${getThemeColorClass('error', 600, 'bg')}`,
+            `active:${getThemeColorClass('error', 700, 'bg')}`,
+            'focus:ring-error-400',
+            'disabled:bg-slate-100 disabled:text-slate-400',
+            'dark:disabled:bg-slate-800 dark:disabled:text-slate-600',
+            'shadow-error-100 dark:shadow-none'
+          )]: variant === 'destructive',
+          // Affirmative
+          [cn(
+            getThemeColorClass('success', 500, 'bg'),
+            'text-gray-900 dark:text-white',
+            `hover:${getThemeColorClass('success', 600, 'bg')}`,
+            `active:${getThemeColorClass('success', 700, 'bg')}`,
+            'focus:ring-success-400',
+            'disabled:bg-slate-100 disabled:text-slate-400',
+            'dark:disabled:bg-slate-800 dark:disabled:text-slate-600',
+            'shadow-success-100 dark:shadow-none'
+          )]: variant === 'affirmative',
         },
         'disabled:cursor-not-allowed disabled:transform-none',
         'hover:translate-y-[-1px] active:translate-y-[1px]',

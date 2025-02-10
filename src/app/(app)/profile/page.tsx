@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Toggle } from '@/components/ui/toggle';
 import { addToast, ToastContainer } from '@/components/ui/toast';
 import { useTheme } from '@/components/ThemeProvider';
-import { PencilIcon } from '@heroicons/react/24/solid';
+import { PencilIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/solid';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTranslations } from '@/lib/i18n';
 import { LanguageSelector } from '@/components/LanguageSelector';
@@ -274,8 +274,14 @@ export default function ProfilePage() {
             onClick={handleSignOut}
             variant="outline"
             size="sm"
+            className="p-2 hover:bg-gray-50 dark:hover:bg-gray-700 group relative"
+            aria-label={t('common.actions.signOut')}
           >
-            {t('common.actions.signOut')}
+            <ArrowRightOnRectangleIcon className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+            <span className="sr-only">{t('common.actions.signOut')}</span>
+            <span className="absolute hidden group-hover:block right-0 top-full mt-1 px-2 py-1 text-xs font-medium text-white bg-gray-900 dark:bg-gray-700 rounded shadow-lg whitespace-nowrap">
+              {t('common.actions.signOut')}
+            </span>
           </Button>
         </div>
       </div>
@@ -316,19 +322,6 @@ export default function ProfilePage() {
               />
             </div>
 
-            {/* Email */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('profile.sections.accountSettings.fields.email.label')}
-              </label>
-              <input
-                type="email"
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-                value={getValue('email') || ''}
-                disabled
-              />
-            </div>
-
             {/* Save/Cancel Buttons */}
             {hasChanges && (
               <div className="pt-4 border-t border-gray-200 dark:border-gray-700 flex gap-4 justify-end">
@@ -342,7 +335,7 @@ export default function ProfilePage() {
                   onClick={saveChanges}
                   disabled={!hasChanges}
                   isLoading={saving}
-                  variant="primary"
+                  variant="affirmative"
                 >
                   {saving ? t('common.actions.savingChanges') : t('common.actions.saveChanges')}
                 </Button>

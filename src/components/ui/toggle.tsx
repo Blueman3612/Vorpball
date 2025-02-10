@@ -1,3 +1,5 @@
+import { cn, getThemeColorClass } from '@/lib/utils';
+
 interface ToggleProps {
   checked: boolean;
   onChange: (checked: boolean) => void;
@@ -34,16 +36,25 @@ export function Toggle({
   return (
     <button
       type="button"
-      className={`relative inline-flex flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed ${
-        checked ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'
-      } ${disabled ? 'opacity-50' : ''} ${sizes[size].toggle} ${className}`}
+      className={cn(
+        'relative inline-flex flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent',
+        'transition-colors duration-200 ease-in-out',
+        'focus:outline-none focus:ring-2 focus:ring-success-400 focus:ring-offset-2 dark:focus:ring-offset-slate-900',
+        'disabled:cursor-not-allowed',
+        checked ? getThemeColorClass('success', 500, 'bg') : 'bg-gray-200 dark:bg-gray-700',
+        disabled && 'opacity-50',
+        sizes[size].toggle,
+        className
+      )}
       disabled={disabled}
       onClick={() => onChange(!checked)}
     >
       <span
-        className={`inline-block transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-          checked ? sizes[size].translate : 'translate-x-0'
-        } ${sizes[size].circle}`}
+        className={cn(
+          'inline-block transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+          checked ? sizes[size].translate : 'translate-x-0',
+          sizes[size].circle
+        )}
       />
     </button>
   );

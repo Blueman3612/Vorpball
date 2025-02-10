@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import { theme as customTheme } from "./src/lib/theme";
 
 const config: Config = {
   darkMode: 'class',
@@ -7,12 +8,32 @@ const config: Config = {
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
+  safelist: [
+    // Success color classes for affirmative buttons
+    'bg-success-500',
+    'hover:bg-success-600',
+    'active:bg-success-700',
+    'focus:ring-success-400',
+    'text-gray-900',
+    'dark:text-white',
+    // Other theme color classes that might be generated dynamically
+    'bg-primary-500',
+    'hover:bg-primary-600',
+    'active:bg-primary-700',
+    'focus:ring-primary-400',
+    'bg-error-500',
+    'hover:bg-error-600',
+    'active:bg-error-700',
+    'focus:ring-error-400',
+  ],
   theme: {
     extend: {
-      colors: {
-        background: "var(--background)",
-        foreground: "var(--foreground)",
-      },
+      colors: customTheme.colors,
+      spacing: customTheme.spacing,
+      borderRadius: customTheme.borderRadius,
+      fontSize: customTheme.typography.fontSizes,
+      fontWeight: customTheme.typography.fontWeights,
+      boxShadow: customTheme.shadows,
       keyframes: {
         'enter-toast': {
           '0%': { 
