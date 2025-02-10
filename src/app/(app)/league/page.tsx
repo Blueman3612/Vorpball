@@ -1,10 +1,24 @@
 'use client';
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { useTranslations } from "@/lib/i18n";
+import { useState } from "react";
 
 export default function LeaguePage() {
   const { t } = useTranslations();
+  const [formData, setFormData] = useState({
+    name: '',
+    scoringType: 'head-to-head',
+    teams: '4',
+    draftType: 'snake',
+    draftDate: ''
+  });
+
+  const handleChange = (field: string, value: string | number) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
 
   return (
     <div className="p-8">
@@ -26,16 +40,12 @@ export default function LeaguePage() {
               {t('league.create.form.sections.info.title')}
             </h2>
             <div className="grid gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {t('league.create.form.sections.info.leagueName.label')}
-                </label>
-                <input
-                  type="text"
-                  placeholder={t('league.create.form.sections.info.leagueName.placeholder')}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-                />
-              </div>
+              <Input
+                label={t('league.create.form.sections.info.leagueName.label')}
+                placeholder={t('league.create.form.sections.info.leagueName.placeholder')}
+                value={formData.name}
+                onChange={(e) => handleChange('name', e.target.value)}
+              />
             </div>
           </div>
 
@@ -45,47 +55,41 @@ export default function LeaguePage() {
               {t('league.create.form.sections.settings.title')}
             </h2>
             <div className="grid gap-6 md:grid-cols-2">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {t('league.create.form.sections.settings.scoringType.label')}
-                </label>
-                <select className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
-                  <option>{t('league.create.form.sections.settings.scoringType.options.headToHead')}</option>
-                  <option>{t('league.create.form.sections.settings.scoringType.options.points')}</option>
-                  <option>{t('league.create.form.sections.settings.scoringType.options.roto')}</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {t('league.create.form.sections.settings.teams.label')}
-                </label>
-                <select className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
-                  {[...Array(12)].map((_, i) => (
-                    <option key={i + 4} value={i + 4}>
-                      {t('league.create.form.sections.settings.teams.teamCount', { count: i + 4 })}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {t('league.create.form.sections.settings.draftType.label')}
-                </label>
-                <select className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
-                  <option>{t('league.create.form.sections.settings.draftType.options.snake')}</option>
-                  <option>{t('league.create.form.sections.settings.draftType.options.auction')}</option>
-                  <option>{t('league.create.form.sections.settings.draftType.options.linear')}</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {t('league.create.form.sections.settings.draftDate.label')}
-                </label>
-                <input
-                  type="datetime-local"
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-                />
-              </div>
+              <Select
+                label={t('league.create.form.sections.settings.scoringType.label')}
+                value={formData.scoringType}
+                onChange={(value) => handleChange('scoringType', value)}
+                options={[
+                  { value: 'head-to-head', label: t('league.create.form.sections.settings.scoringType.options.headToHead') },
+                  { value: 'points', label: t('league.create.form.sections.settings.scoringType.options.points') },
+                  { value: 'roto', label: t('league.create.form.sections.settings.scoringType.options.roto') }
+                ]}
+              />
+              <Select
+                label={t('league.create.form.sections.settings.teams.label')}
+                value={formData.teams}
+                onChange={(value) => handleChange('teams', value)}
+                options={[...Array(12)].map((_, i) => ({
+                  value: String(i + 4),
+                  label: t('league.create.form.sections.settings.teams.teamCount', { count: i + 4 })
+                }))}
+              />
+              <Select
+                label={t('league.create.form.sections.settings.draftType.label')}
+                value={formData.draftType}
+                onChange={(value) => handleChange('draftType', value)}
+                options={[
+                  { value: 'snake', label: t('league.create.form.sections.settings.draftType.options.snake') },
+                  { value: 'auction', label: t('league.create.form.sections.settings.draftType.options.auction') },
+                  { value: 'linear', label: t('league.create.form.sections.settings.draftType.options.linear') }
+                ]}
+              />
+              <Input
+                type="datetime-local"
+                label={t('league.create.form.sections.settings.draftDate.label')}
+                value={formData.draftDate}
+                onChange={(e) => handleChange('draftDate', e.target.value)}
+              />
             </div>
           </div>
 
