@@ -2,7 +2,7 @@ import { ButtonHTMLAttributes, ReactNode } from 'react';
 import { clsx } from 'clsx';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline';
+  variant?: 'primary' | 'secondary' | 'outline' | 'destructive';
   size?: 'sm' | 'md' | 'lg';
   isLoading?: boolean;
   children: ReactNode;
@@ -41,6 +41,9 @@ export function Button({
           // Outline
           'border-2 border-gray-300 bg-transparent text-gray-700 hover:bg-gray-50 disabled:bg-gray-50 disabled:text-gray-400 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800':
             variant === 'outline',
+          // Destructive
+          'bg-red-600 text-white hover:bg-red-700 disabled:bg-red-200 disabled:text-red-100 dark:disabled:bg-red-900 dark:disabled:text-red-300':
+            variant === 'destructive',
         },
         'disabled:cursor-not-allowed',
         className

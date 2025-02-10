@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -25,16 +25,7 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
 
-  useEffect(() => {
-    getProfile();
-  }, []);
-
-  // Update hasChanges whenever unsavedChanges changes
-  useEffect(() => {
-    setHasChanges(Object.keys(unsavedChanges).length > 0);
-  }, [unsavedChanges]);
-
-  async function getProfile() {
+  const getProfile = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
@@ -57,7 +48,16 @@ export default function ProfilePage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [router]);
+
+  useEffect(() => {
+    getProfile();
+  }, [getProfile]);
+
+  // Update hasChanges whenever unsavedChanges changes
+  useEffect(() => {
+    setHasChanges(Object.keys(unsavedChanges).length > 0);
+  }, [unsavedChanges]);
 
   async function saveChanges() {
     if (!hasChanges) return;
