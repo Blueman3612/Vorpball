@@ -19,9 +19,13 @@ export type MessageKeys = DotPrefix<typeof enMessages>;
 
 type SupportedLocales = 'en';
 
+type NestedMessages = {
+  [key: string]: string | NestedMessages;
+};
+
 // Flatten nested messages
-function flattenMessages(nestedMessages: any, prefix = ''): Record<string, string> {
-  return Object.keys(nestedMessages).reduce((messages: any, key) => {
+function flattenMessages(nestedMessages: NestedMessages, prefix = ''): Record<string, string> {
+  return Object.keys(nestedMessages).reduce((messages: Record<string, string>, key) => {
     const value = nestedMessages[key];
     const prefixedKey = prefix ? `${prefix}.${key}` : key;
 

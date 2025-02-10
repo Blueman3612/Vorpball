@@ -5,7 +5,6 @@ import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { 
-  HomeIcon, 
   UsersIcon, 
   ChartBarIcon, 
   TrophyIcon,

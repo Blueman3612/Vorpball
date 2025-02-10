@@ -17,10 +17,9 @@ const languages: Language[] = [
 
 interface LanguageSelectorProps {
   currentLanguage: string;
-  onLanguageChange: (language: string) => void;
 }
 
-export function LanguageSelector({ currentLanguage, onLanguageChange }: LanguageSelectorProps) {
+export function LanguageSelector({ currentLanguage }: LanguageSelectorProps) {
   const { t } = useTranslations();
   const selectedLanguage = languages.find(lang => lang.code === currentLanguage) || languages[0];
 
