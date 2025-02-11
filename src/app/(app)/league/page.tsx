@@ -179,7 +179,6 @@ export default function LeaguePage() {
   });
   const [templates, setTemplates] = useState<ScoringTemplate[]>(DEFAULT_TEMPLATES);
   const [selectedTemplate, setSelectedTemplate] = useState<string>('vorpball');
-  const [isLoading, setIsLoading] = useState(true);
   const [newTemplateName, setNewTemplateName] = useState('');
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
   const [isDeletingTemplate, setIsDeletingTemplate] = useState(false);
@@ -244,8 +243,6 @@ export default function LeaguePage() {
     } catch (error) {
       console.error('Error fetching custom templates:', error);
       addToast('Failed to load custom templates', 'error');
-    } finally {
-      setIsLoading(false);
     }
   };
 
