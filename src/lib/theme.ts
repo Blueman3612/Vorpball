@@ -38,8 +38,15 @@ export const theme = {
     },
     error: {
       50: '#fef2f2',
-      500: '#ef4444',
-      600: '#dc2626',
+      100: '#fee2e2',
+      200: '#fecaca',
+      300: '#fca5a5',
+      400: '#f87171',
+      500: '#e05252',  // Medium saturation red
+      600: '#cc4444',  // Medium saturation hover state
+      700: '#b83b3b',  // Medium saturation active state
+      800: '#a33333',
+      900: '#8f2c2c',
     },
     warning: {
       50: '#fffbeb',

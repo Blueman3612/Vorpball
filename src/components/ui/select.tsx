@@ -155,7 +155,7 @@ export function Select({
         {isOpen && (
           <ul
             className={cn(
-              'absolute z-10 w-full mt-1',
+              'absolute z-50 w-full mt-1',
               'max-h-60 overflow-auto',
               'bg-white dark:bg-gray-900',
               'border border-gray-200 dark:border-gray-700',

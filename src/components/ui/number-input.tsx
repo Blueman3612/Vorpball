@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { MinusIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
@@ -28,6 +28,13 @@ export function NumberInput({
   const [isFocused, setIsFocused] = useState(false);
   const [inputValue, setInputValue] = useState<string>(formatDisplayValue(value));
   const showFloatingLabel = isFocused || value !== 0;
+
+  // Update inputValue when external value changes
+  useEffect(() => {
+    if (!isFocused) {
+      setInputValue(formatDisplayValue(value));
+    }
+  }, [value, isFocused]);
 
   // Format display value to remove trailing zeros
   function formatDisplayValue(num: number): string {
@@ -107,7 +114,7 @@ export function NumberInput({
             type="button"
             onClick={handleClear}
             className={cn(
-              'absolute right-2 -top-5 p-0.5 rounded-full',
+              'absolute right-2 -top-5 p-0.5 rounded-full z-10',
               'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300',
               'transition-colors duration-200',
               'focus:outline-none focus:ring-2 focus:ring-primary-400/20'
