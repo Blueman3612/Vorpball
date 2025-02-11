@@ -53,10 +53,20 @@ const config: Config = {
             'background-position': '100% 50%',
           },
         },
+        'fade-in': {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' }
+        },
+        'zoom-in-95': {
+          '0%': { transform: 'scale(0.95)' },
+          '100%': { transform: 'scale(1)' }
+        },
       },
       animation: {
         'enter-toast': 'enter-toast 0.2s ease-out',
         'gradient-slow': 'gradient 15s ease infinite',
+        'fade-in': 'fade-in 0.2s ease-out',
+        'zoom-in-95': 'zoom-in-95 0.2s ease-out',
       },
       backgroundSize: {
         'gradient-size': '400% 400%',

@@ -8,6 +8,7 @@ import { useTranslations } from "@/lib/i18n";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { addToast, ToastContainer } from "@/components/ui/toast";
+import { ConfirmationModal } from "@/components/ui/modal";
 
 interface ScoringTemplate {
   id: string;
@@ -124,7 +125,7 @@ export default function LeaguePage() {
     return {
       name: '',
       scoringType: 'head-to-head',
-      teams: '4',
+      teams: 10,
       draftType: 'snake',
       draftDate: '',
       scoring: {
@@ -157,11 +158,16 @@ export default function LeaguePage() {
   const [newTemplateName, setNewTemplateName] = useState('');
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
   const [isDeletingTemplate, setIsDeletingTemplate] = useState(false);
+  const [templateToDelete, setTemplateToDelete] = useState<ScoringTemplate | null>(null);
 
   const customTemplates = templates.filter(t => t.created_by !== null);
   const hasReachedTemplateLimit = customTemplates.length >= 5;
 
   const handleChange = (field: string, value: string | number) => {
+    if (field === 'teams' && (value === '' || value === 0)) {
+      setFormData(prev => ({ ...prev, [field]: 10 }));
+      return;
+    }
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -306,6 +312,7 @@ export default function LeaguePage() {
       addToast('Failed to delete template', 'error');
     } finally {
       setIsDeletingTemplate(false);
+      setTemplateToDelete(null);
     }
   };
 
@@ -391,6 +398,17 @@ export default function LeaguePage() {
   return (
     <div className="p-8">
       <ToastContainer />
+      <ConfirmationModal
+        isOpen={templateToDelete !== null}
+        onClose={() => setTemplateToDelete(null)}
+        onConfirm={() => templateToDelete && handleDeleteTemplate(templateToDelete)}
+        title="Delete Template"
+        description={`Are you sure you want to delete "${templateToDelete?.name}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        isDestructive={true}
+        isLoading={isDeletingTemplate}
+      />
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
           {t('league.create.title')}
@@ -439,14 +457,15 @@ export default function LeaguePage() {
                     { value: 'roto', label: t('league.create.form.sections.settings.scoringType.options.roto') }
                   ]}
                 />
-                <Select
+                <NumberInput
                   label={t('league.create.form.sections.settings.teams.label')}
-                  value={formData.teams}
+                  value={Number(formData.teams)}
                   onChange={(value) => handleChange('teams', value)}
-                  options={[...Array(12)].map((_, i) => ({
-                    value: String(i + 4),
-                    label: t('league.create.form.sections.settings.teams.teamCount', { count: i + 4 })
-                  }))}
+                  min={2}
+                  max={16}
+                  step={1}
+                  showClearButton={false}
+                  defaultEmptyValue={10}
                 />
                 <Select
                   label={t('league.create.form.sections.settings.draftType.label')}
@@ -495,7 +514,7 @@ export default function LeaguePage() {
                                     e.stopPropagation();
                                     const selectedTemplate = templates.find(t => t.id === template.id);
                                     if (!selectedTemplate) return;
-                                    handleDeleteTemplate(selectedTemplate);
+                                    setTemplateToDelete(selectedTemplate);
                                   }}
                                   onKeyDown={(e) => {
                                     if (e.key === 'Enter' || e.key === ' ') {
@@ -503,7 +522,7 @@ export default function LeaguePage() {
                                       e.stopPropagation();
                                       const selectedTemplate = templates.find(t => t.id === template.id);
                                       if (!selectedTemplate) return;
-                                      handleDeleteTemplate(selectedTemplate);
+                                      setTemplateToDelete(selectedTemplate);
                                     }
                                   }}
                                   className="p-1 text-gray-400 hover:text-error-500 dark:text-gray-500 dark:hover:text-error-500 transition-colors ml-auto cursor-pointer"
@@ -521,7 +540,7 @@ export default function LeaguePage() {
                   </div>
                   {hasNonZeroValues && (
                     <Button
-                      variant="destructive"
+                      variant="outline"
                       size="sm"
                       onClick={handleClearAll}
                       className="mt-2"
@@ -564,6 +583,7 @@ export default function LeaguePage() {
                   min={-100}
                   max={100}
                   step={0.05}
+                  defaultEmptyValue={0}
                 />
                 <NumberInput
                   key={`drbs-${selectedTemplate}`}
@@ -573,6 +593,7 @@ export default function LeaguePage() {
                   min={-100}
                   max={100}
                   step={0.05}
+                  defaultEmptyValue={0}
                 />
                 <NumberInput
                   key={`orbs-${selectedTemplate}`}
@@ -582,6 +603,7 @@ export default function LeaguePage() {
                   min={-100}
                   max={100}
                   step={0.05}
+                  defaultEmptyValue={0}
                 />
                 <NumberInput
                   key={`asts-${selectedTemplate}`}
@@ -591,6 +613,7 @@ export default function LeaguePage() {
                   min={-100}
                   max={100}
                   step={0.05}
+                  defaultEmptyValue={0}
                 />
                 <NumberInput
                   key={`stls-${selectedTemplate}`}
@@ -600,6 +623,7 @@ export default function LeaguePage() {
                   min={-100}
                   max={100}
                   step={0.05}
+                  defaultEmptyValue={0}
                 />
                 <NumberInput
                   key={`blks-${selectedTemplate}`}
@@ -609,6 +633,7 @@ export default function LeaguePage() {
                   min={-100}
                   max={100}
                   step={0.05}
+                  defaultEmptyValue={0}
                 />
                 <NumberInput
                   key={`tos-${selectedTemplate}`}
@@ -618,6 +643,7 @@ export default function LeaguePage() {
                   min={-100}
                   max={100}
                   step={0.05}
+                  defaultEmptyValue={0}
                 />
                 <NumberInput
                   key={`fgm-${selectedTemplate}`}
@@ -627,6 +653,7 @@ export default function LeaguePage() {
                   min={-100}
                   max={100}
                   step={0.05}
+                  defaultEmptyValue={0}
                 />
                 <NumberInput
                   key={`fga-${selectedTemplate}`}
@@ -636,6 +663,7 @@ export default function LeaguePage() {
                   min={-100}
                   max={100}
                   step={0.05}
+                  defaultEmptyValue={0}
                 />
                 <NumberInput
                   key={`tpm-${selectedTemplate}`}
@@ -645,6 +673,7 @@ export default function LeaguePage() {
                   min={-100}
                   max={100}
                   step={0.05}
+                  defaultEmptyValue={0}
                 />
                 <NumberInput
                   key={`tpa-${selectedTemplate}`}
@@ -654,6 +683,7 @@ export default function LeaguePage() {
                   min={-100}
                   max={100}
                   step={0.05}
+                  defaultEmptyValue={0}
                 />
                 <NumberInput
                   key={`ftm-${selectedTemplate}`}
@@ -663,6 +693,7 @@ export default function LeaguePage() {
                   min={-100}
                   max={100}
                   step={0.05}
+                  defaultEmptyValue={0}
                 />
                 <NumberInput
                   key={`fta-${selectedTemplate}`}
@@ -672,6 +703,7 @@ export default function LeaguePage() {
                   min={-100}
                   max={100}
                   step={0.05}
+                  defaultEmptyValue={0}
                 />
                 <NumberInput
                   key={`dbl-${selectedTemplate}`}
@@ -681,6 +713,7 @@ export default function LeaguePage() {
                   min={-100}
                   max={100}
                   step={0.05}
+                  defaultEmptyValue={0}
                 />
                 <NumberInput
                   key={`tpl-${selectedTemplate}`}
@@ -690,6 +723,7 @@ export default function LeaguePage() {
                   min={-100}
                   max={100}
                   step={0.05}
+                  defaultEmptyValue={0}
                 />
                 <NumberInput
                   key={`qpl-${selectedTemplate}`}
@@ -699,6 +733,7 @@ export default function LeaguePage() {
                   min={-100}
                   max={100}
                   step={0.05}
+                  defaultEmptyValue={0}
                 />
                 <NumberInput
                   key={`fls-${selectedTemplate}`}
@@ -708,6 +743,7 @@ export default function LeaguePage() {
                   min={-100}
                   max={100}
                   step={0.05}
+                  defaultEmptyValue={0}
                 />
                 <NumberInput
                   key={`pt10-${selectedTemplate}`}
@@ -717,6 +753,7 @@ export default function LeaguePage() {
                   min={-100}
                   max={100}
                   step={0.05}
+                  defaultEmptyValue={0}
                 />
                 <NumberInput
                   key={`rb10-${selectedTemplate}`}
@@ -726,6 +763,7 @@ export default function LeaguePage() {
                   min={-100}
                   max={100}
                   step={0.05}
+                  defaultEmptyValue={0}
                 />
                 <NumberInput
                   key={`ast10-${selectedTemplate}`}
@@ -735,6 +773,7 @@ export default function LeaguePage() {
                   min={-100}
                   max={100}
                   step={0.05}
+                  defaultEmptyValue={0}
                 />
               </div>
             </div>

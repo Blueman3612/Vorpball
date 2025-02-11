@@ -10,6 +10,8 @@ interface NumberInputProps extends Omit<React.InputHTMLAttributes<HTMLInputEleme
   max?: number;
   step?: number;
   error?: string;
+  showClearButton?: boolean;
+  defaultEmptyValue?: number;
 }
 
 export function NumberInput({
@@ -23,6 +25,8 @@ export function NumberInput({
   error,
   disabled,
   required,
+  showClearButton = true,
+  defaultEmptyValue,
   ...props
 }: NumberInputProps) {
   const [isFocused, setIsFocused] = useState(false);
@@ -76,7 +80,9 @@ export function NumberInput({
   // Handle blur (unfocus)
   const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     setIsFocused(false);
-    let newValue = inputValue === '' || inputValue === '-' ? 0 : parseFloat(inputValue);
+    let newValue = inputValue === '' || inputValue === '-' 
+      ? (defaultEmptyValue !== undefined ? defaultEmptyValue : (min !== undefined ? min : 0))
+      : parseFloat(inputValue);
     newValue = Math.min(100, Math.max(-100, newValue));
     const rounded = roundToStep(newValue);
     onChange(rounded);
@@ -101,7 +107,8 @@ export function NumberInput({
 
   // Handle clear
   const handleClear = () => {
-    onChange(0);
+    const emptyValue = defaultEmptyValue !== undefined ? defaultEmptyValue : (min !== undefined ? min : 0);
+    onChange(emptyValue);
     setInputValue('');
   };
 
@@ -109,7 +116,7 @@ export function NumberInput({
     <div className="w-full">
       <div className="relative">
         {/* Clear button */}
-        {value !== 0 && (
+        {showClearButton && value !== 0 && (
           <button
             type="button"
             onClick={handleClear}
