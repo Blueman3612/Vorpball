@@ -4,7 +4,7 @@ import { ChevronUpDownIcon } from '@heroicons/react/24/outline';
 
 interface SelectOption {
   value: string | number;
-  label: string;
+  label: string | React.ReactNode;
 }
 
 interface SelectProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'value' | 'onChange'> {
@@ -116,7 +116,7 @@ export function Select({
             }
           }}
           className={cn(
-            'w-full px-3 h-10',
+            'w-full h-10 px-3',
             'bg-white dark:bg-gray-900',
             'text-left text-gray-900 dark:text-white',
             'border rounded-lg',

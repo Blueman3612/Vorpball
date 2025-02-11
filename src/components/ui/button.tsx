@@ -22,20 +22,20 @@ export function Button({
       disabled={isLoading || disabled}
       className={cn(
         // Base styles
-        'rounded-lg font-medium transition-all duration-200 shadow-sm',
+        'rounded-lg font-medium transition-all duration-200 shadow-sm inline-flex items-center justify-center',
         'focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-slate-900',
         // Size variants
         {
-          'px-3 py-1.5 text-sm': size === 'sm',
-          'px-4 py-2': size === 'md',
-          'px-6 py-3 text-lg': size === 'lg',
+          'h-8 min-h-[2.46rem] px-4 text-sm': size === 'sm',
+          'h-10 min-h-[2.5rem] px-5': size === 'md',
+          'h-12 min-h-[3rem] px-6 text-lg': size === 'lg',
         },
         // Color variants
         {
           // Primary
           [cn(
             getThemeColorClass('primary', 500, 'bg'),
-            'text-white',
+            'text-gray-900 dark:text-white',
             `hover:${getThemeColorClass('primary', 600, 'bg')}`,
             `active:${getThemeColorClass('primary', 700, 'bg')}`,
             'focus:ring-primary-400',
@@ -65,7 +65,7 @@ export function Button({
           // Destructive
           [cn(
             getThemeColorClass('error', 500, 'bg'),
-            'text-white',
+            'text-gray-900 dark:text-white',
             `hover:${getThemeColorClass('error', 600, 'bg')}`,
             `active:${getThemeColorClass('error', 700, 'bg')}`,
             'focus:ring-error-400',

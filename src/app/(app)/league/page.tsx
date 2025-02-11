@@ -156,6 +156,10 @@ export default function LeaguePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [newTemplateName, setNewTemplateName] = useState('');
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+  const [isDeletingTemplate, setIsDeletingTemplate] = useState(false);
+
+  const customTemplates = templates.filter(t => t.created_by !== null);
+  const hasReachedTemplateLimit = customTemplates.length >= 5;
 
   const handleChange = (field: string, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -250,6 +254,61 @@ export default function LeaguePage() {
 
   const hasNonZeroValues = Object.values(formData.scoring).some(value => value !== 0);
 
+  const formToTemplateValues = (formScoring: typeof formData.scoring): Omit<ScoringTemplate, 'id' | 'name' | 'created_by' | 'created_at'> => {
+    return Object.fromEntries(
+      Object.entries(formScoring).map(([key, value]) => [key, value === 0 ? null : value])
+    ) as Omit<ScoringTemplate, 'id' | 'name' | 'created_by' | 'created_at'>;
+  };
+
+  const templatesMatch = (template1: Partial<ScoringTemplate>, template2: Partial<ScoringTemplate>): boolean => {
+    const scoringFields = ['pts', 'drbs', 'orbs', 'asts', 'stls', 'blks', 'tos', 'fgm', 'fga', 'tpm', 'tpa', 'ftm', 'fta', 'dbl', 'tpl', 'qpl', 'fls', 'pt10', 'rb10', 'ast10'] as const;
+    return scoringFields.every(field => template1[field] === template2[field]);
+  };
+
+  const handleDeleteTemplate = async (template: ScoringTemplate) => {
+    if (!template || !template.created_by) return;
+
+    try {
+      setIsDeletingTemplate(true);
+
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      if (!user) {
+        addToast('You must be logged in to delete templates', 'error');
+        return;
+      }
+
+      // Verify the template belongs to the user
+      if (template.created_by !== user.id) {
+        addToast('You can only delete your own templates', 'error');
+        return;
+      }
+
+      const { error: deleteError } = await supabase
+        .from('scoring_templates')
+        .delete()
+        .eq('id', template.id)
+        .eq('created_by', user.id);
+
+      if (deleteError) throw deleteError;
+
+      addToast('Template deleted successfully');
+      if (selectedTemplate === template.id) {
+        setSelectedTemplate('vorpball');
+        handleTemplateChange('vorpball');
+      }
+      
+      // Refresh templates
+      fetchCustomTemplates();
+    } catch (error) {
+      console.error('Error deleting template:', error);
+      addToast('Failed to delete template', 'error');
+    } finally {
+      setIsDeletingTemplate(false);
+    }
+  };
+
   const handleSaveTemplate = async () => {
     if (!newTemplateName.trim()) {
       addToast('Please enter a template name', 'error');
@@ -258,6 +317,33 @@ export default function LeaguePage() {
 
     try {
       setIsSavingTemplate(true);
+
+      // Get current user first to check template limit
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      if (!user) {
+        addToast('You must be logged in to save templates', 'error');
+        return;
+      }
+
+      // Check template limit
+      if (hasReachedTemplateLimit) {
+        addToast('You have reached the maximum limit of 5 custom templates', 'error');
+        return;
+      }
+
+      // Convert form values to template format (0s to NULLs)
+      const templateValues = formToTemplateValues(formData.scoring);
+
+      // Check if the template matches any default template
+      const matchingDefault = DEFAULT_TEMPLATES.find(defaultTemplate => 
+        templatesMatch(templateValues, defaultTemplate)
+      );
+
+      if (matchingDefault) {
+        addToast(`Cannot save - matches default template "${matchingDefault.name}"`, 'error');
+        return;
+      }
 
       // Check if a template with this name already exists
       const { data: existingTemplates, error: checkError } = await supabase
@@ -277,22 +363,14 @@ export default function LeaguePage() {
         return;
       }
 
-      // Get current user
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      if (!user) {
-        addToast('You must be logged in to save templates', 'error');
-        return;
-      }
-
-      // Save the template
+      // Save the template with NULL values instead of 0s
       const { error: saveError } = await supabase
         .from('scoring_templates')
         .insert({
           name: newTemplateName.trim(),
           created_by: user.id,
           created_at: new Date().toISOString(),
-          ...formData.scoring
+          ...templateValues
         });
 
       if (saveError) throw saveError;
@@ -398,16 +476,48 @@ export default function LeaguePage() {
                   {t('league.create.form.sections.scoring.title')}
                 </h2>
                 <div className="flex flex-row flex-wrap items-start gap-2 flex-1 min-w-0">
-                  <div className="w-64 max-w-full mt-2 relative z-20">
-                    <Select
-                      label="Template"
-                      value={selectedTemplate}
-                      onChange={handleTemplateChange}
-                      options={templates.map(template => ({
-                        value: template.id,
-                        label: template.name
-                      }))}
-                    />
+                  <div className="flex items-center gap-2">
+                    <div className="w-64 max-w-full mt-2 relative z-20">
+                      <Select
+                        label="Template"
+                        value={selectedTemplate}
+                        onChange={handleTemplateChange}
+                        options={templates.map(template => ({
+                          value: template.id,
+                          label: (
+                            <div className="flex items-center justify-between w-full">
+                              <span>{template.name}</span>
+                              {template.created_by && (
+                                <div
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const selectedTemplate = templates.find(t => t.id === template.id);
+                                    if (!selectedTemplate) return;
+                                    handleDeleteTemplate(selectedTemplate);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      const selectedTemplate = templates.find(t => t.id === template.id);
+                                      if (!selectedTemplate) return;
+                                      handleDeleteTemplate(selectedTemplate);
+                                    }
+                                  }}
+                                  className="p-1 text-gray-400 hover:text-error-500 dark:text-gray-500 dark:hover:text-error-500 transition-colors ml-auto cursor-pointer"
+                                >
+                                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m4-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        }))}
+                      />
+                    </div>
                   </div>
                   {hasNonZeroValues && (
                     <Button
@@ -424,16 +534,17 @@ export default function LeaguePage() {
                     <Input
                       label="Custom Template"
                       placeholder="Enter template name"
-                      value={newTemplateName}
+                      value={hasReachedTemplateLimit ? "Custom template limit reached (5/5)" : newTemplateName}
                       onChange={(e) => setNewTemplateName(e.target.value.slice(0, 24))}
                       className="w-64 max-w-full mt-2"
                       maxLength={24}
+                      disabled={hasReachedTemplateLimit}
                     />
                     <Button
                       variant="affirmative"
                       size="sm"
                       onClick={handleSaveTemplate}
-                      disabled={isSavingTemplate || !newTemplateName.trim()}
+                      disabled={isSavingTemplate || !newTemplateName.trim() || hasReachedTemplateLimit}
                       isLoading={isSavingTemplate}
                       className="mt-2"
                     >
@@ -600,7 +711,7 @@ export default function LeaguePage() {
                 />
                 <NumberInput
                   key={`pt10-${selectedTemplate}`}
-                  label="10 PTS"
+                  label="10+ PTS"
                   value={formData.scoring.pt10}
                   onChange={(value) => handleScoringChange('pt10', value)}
                   min={-100}
@@ -609,7 +720,7 @@ export default function LeaguePage() {
                 />
                 <NumberInput
                   key={`rb10-${selectedTemplate}`}
-                  label="10 REB"
+                  label="10+ REB"
                   value={formData.scoring.rb10}
                   onChange={(value) => handleScoringChange('rb10', value)}
                   min={-100}
@@ -618,7 +729,7 @@ export default function LeaguePage() {
                 />
                 <NumberInput
                   key={`ast10-${selectedTemplate}`}
-                  label="10 AST"
+                  label="10+ AST"
                   value={formData.scoring.ast10}
                   onChange={(value) => handleScoringChange('ast10', value)}
                   min={-100}

@@ -1,4 +1,4 @@
-import { InputHTMLAttributes, useState } from 'react';
+import { InputHTMLAttributes, useState, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { PencilIcon } from '@heroicons/react/24/outline';
 
@@ -22,8 +22,16 @@ export function Input({
   ...props
 }: InputProps) {
   const [isFocused, setIsFocused] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
   const hasValue = value != null ? String(value).length > 0 : defaultValue != null;
   const showFloatingLabel = isFocused || hasValue || type === 'datetime-local';
+
+  const handlePencilClick = () => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  };
 
   return (
     <div className="w-full">
@@ -45,6 +53,7 @@ export function Input({
           </label>
         )}
         <input
+          ref={inputRef}
           type={type}
           disabled={disabled}
           value={value}
@@ -59,7 +68,7 @@ export function Input({
             'placeholder:text-gray-400 dark:placeholder:text-gray-500',
             'disabled:opacity-50 disabled:cursor-not-allowed',
             'focus:outline-none focus:ring-2 focus:ring-offset-0',
-            (!hasValue && type !== 'datetime-local') && 'pr-10',
+            type !== 'datetime-local' && 'pr-10',
             error
               ? 'border-error-500 focus:border-error-500 focus:ring-error-400/20'
               : cn(
@@ -79,17 +88,33 @@ export function Input({
           }}
           {...props}
         />
-        {error && (
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-error-500">
-            <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
-          </div>
-        )}
-        {!error && !hasValue && type !== 'datetime-local' && (
-          <div className="absolute right-3 top-1/2 -translate-y-1/2">
-            <PencilIcon className="h-4 w-4 text-gray-400" />
-          </div>
+        {type !== 'datetime-local' && (
+          <>
+            {error ? (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-error-500">
+                <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handlePencilClick}
+                className={cn(
+                  'absolute right-3 top-1/2 -translate-y-1/2',
+                  'p-1 rounded-md z-10',
+                  'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300',
+                  'transition-colors duration-200',
+                  'focus:outline-none focus:ring-2 focus:ring-primary-400/20',
+                  disabled && 'pointer-events-none'
+                )}
+                tabIndex={-1}
+                disabled={disabled}
+              >
+                <PencilIcon className="h-4 w-4" />
+              </button>
+            )}
+          </>
         )}
       </div>
       {(error || helperText) && (
