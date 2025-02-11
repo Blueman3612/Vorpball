@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { NumberInput } from "@/components/ui/number-input";
 import { useTranslations } from "@/lib/i18n";
 import { useState } from "react";
 
@@ -13,11 +14,43 @@ export default function LeaguePage() {
     scoringType: 'head-to-head',
     teams: '4',
     draftType: 'snake',
-    draftDate: ''
+    draftDate: '',
+    scoring: {
+      pts: 1,
+      drbs: 1.2,
+      orbs: 1.5,
+      asts: 1.5,
+      stls: 2,
+      blks: 2,
+      tos: -1,
+      fgm: 1,
+      fga: -0.5,
+      tpm: 1,
+      tpa: -0.5,
+      ftm: 1,
+      fta: -0.5,
+      dbl: 5,
+      tpl: 10,
+      qpl: 20,
+      fls: -0.5,
+      pt10: 1,
+      rb10: 1,
+      ast10: 1
+    }
   });
 
   const handleChange = (field: string, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleScoringChange = (stat: keyof typeof formData.scoring, value: number) => {
+    setFormData(prev => ({
+      ...prev,
+      scoring: {
+        ...prev.scoring,
+        [stat]: value
+      }
+    }));
   };
 
   return (
@@ -94,6 +127,192 @@ export default function LeaguePage() {
                   label={t('league.create.form.sections.settings.draftDate.label')}
                   value={formData.draftDate}
                   onChange={(e) => handleChange('draftDate', e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Scoring Settings Section */}
+          <div>
+            <div className="px-8 py-5 border-y border-gray-200 dark:border-gray-700">
+              <div className="flex items-center gap-4">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {t('league.create.form.sections.scoring.title')}
+                </h2>
+                <div className="w-48 mt-2 relative z-20">
+                  <Select
+                    label="Template"
+                    value="default"
+                    onChange={() => {}}
+                    options={[
+                      { value: 'default', label: 'Default' },
+                      { value: 'draftkings', label: 'Draft Kings' }
+                    ]}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="p-8">
+              <div className="grid gap-6 grid-cols-[repeat(auto-fit,minmax(180px,1fr))]">
+                <NumberInput
+                  label="Point"
+                  value={formData.scoring.pts}
+                  onChange={(value) => handleScoringChange('pts', value)}
+                  min={-100}
+                  max={100}
+                  step={0.05}
+                />
+                <NumberInput
+                  label="D Rebound"
+                  value={formData.scoring.drbs}
+                  onChange={(value) => handleScoringChange('drbs', value)}
+                  min={-100}
+                  max={100}
+                  step={0.05}
+                />
+                <NumberInput
+                  label="O Rebound"
+                  value={formData.scoring.orbs}
+                  onChange={(value) => handleScoringChange('orbs', value)}
+                  min={-100}
+                  max={100}
+                  step={0.05}
+                />
+                <NumberInput
+                  label="Assist"
+                  value={formData.scoring.asts}
+                  onChange={(value) => handleScoringChange('asts', value)}
+                  min={-100}
+                  max={100}
+                  step={0.05}
+                />
+                <NumberInput
+                  label="Steal"
+                  value={formData.scoring.stls}
+                  onChange={(value) => handleScoringChange('stls', value)}
+                  min={-100}
+                  max={100}
+                  step={0.05}
+                />
+                <NumberInput
+                  label="Block"
+                  value={formData.scoring.blks}
+                  onChange={(value) => handleScoringChange('blks', value)}
+                  min={-100}
+                  max={100}
+                  step={0.05}
+                />
+                <NumberInput
+                  label="Turnover"
+                  value={formData.scoring.tos}
+                  onChange={(value) => handleScoringChange('tos', value)}
+                  min={-100}
+                  max={100}
+                  step={0.05}
+                />
+                <NumberInput
+                  label="FG Make"
+                  value={formData.scoring.fgm}
+                  onChange={(value) => handleScoringChange('fgm', value)}
+                  min={-100}
+                  max={100}
+                  step={0.05}
+                />
+                <NumberInput
+                  label="FG Attempt"
+                  value={formData.scoring.fga}
+                  onChange={(value) => handleScoringChange('fga', value)}
+                  min={-100}
+                  max={100}
+                  step={0.05}
+                />
+                <NumberInput
+                  label="3P Make"
+                  value={formData.scoring.tpm}
+                  onChange={(value) => handleScoringChange('tpm', value)}
+                  min={-100}
+                  max={100}
+                  step={0.05}
+                />
+                <NumberInput
+                  label="3P Attempt"
+                  value={formData.scoring.tpa}
+                  onChange={(value) => handleScoringChange('tpa', value)}
+                  min={-100}
+                  max={100}
+                  step={0.05}
+                />
+                <NumberInput
+                  label="FT Make"
+                  value={formData.scoring.ftm}
+                  onChange={(value) => handleScoringChange('ftm', value)}
+                  min={-100}
+                  max={100}
+                  step={0.05}
+                />
+                <NumberInput
+                  label="FT Attempt"
+                  value={formData.scoring.fta}
+                  onChange={(value) => handleScoringChange('fta', value)}
+                  min={-100}
+                  max={100}
+                  step={0.05}
+                />
+                <NumberInput
+                  label="Dbl Dbl"
+                  value={formData.scoring.dbl}
+                  onChange={(value) => handleScoringChange('dbl', value)}
+                  min={-100}
+                  max={100}
+                  step={0.05}
+                />
+                <NumberInput
+                  label="Trp Dbl"
+                  value={formData.scoring.tpl}
+                  onChange={(value) => handleScoringChange('tpl', value)}
+                  min={-100}
+                  max={100}
+                  step={0.05}
+                />
+                <NumberInput
+                  label="Quad Dbl"
+                  value={formData.scoring.qpl}
+                  onChange={(value) => handleScoringChange('qpl', value)}
+                  min={-100}
+                  max={100}
+                  step={0.05}
+                />
+                <NumberInput
+                  label="Foul"
+                  value={formData.scoring.fls}
+                  onChange={(value) => handleScoringChange('fls', value)}
+                  min={-100}
+                  max={100}
+                  step={0.05}
+                />
+                <NumberInput
+                  label="10 PTS"
+                  value={formData.scoring.pt10}
+                  onChange={(value) => handleScoringChange('pt10', value)}
+                  min={-100}
+                  max={100}
+                  step={0.05}
+                />
+                <NumberInput
+                  label="10 REB"
+                  value={formData.scoring.rb10}
+                  onChange={(value) => handleScoringChange('rb10', value)}
+                  min={-100}
+                  max={100}
+                  step={0.05}
+                />
+                <NumberInput
+                  label="10 AST"
+                  value={formData.scoring.ast10}
+                  onChange={(value) => handleScoringChange('ast10', value)}
+                  min={-100}
+                  max={100}
+                  step={0.05}
                 />
               </div>
             </div>

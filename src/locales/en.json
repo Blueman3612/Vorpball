@@ -124,6 +124,10 @@
               "label": "Draft Date"
             }
           },
+          "scoring": {
+            "title": "Scoring Settings",
+            "description": "Configure how many fantasy points each statistic is worth"
+          },
           "roster": {
             "title": "Roster Settings",
             "defaultSettings": "Default roster settings will be used:",
