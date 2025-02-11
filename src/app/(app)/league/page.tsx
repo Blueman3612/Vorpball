@@ -12,6 +12,8 @@ import { addToast, ToastContainer } from "@/components/ui/toast";
 interface ScoringTemplate {
   id: string;
   name: string;
+  created_by: string | null;
+  created_at: string | null;
   pts: number | null;
   drbs: number | null;
   orbs: number | null;
@@ -34,40 +36,126 @@ interface ScoringTemplate {
   ast10: number | null;
 }
 
+const DEFAULT_TEMPLATES: ScoringTemplate[] = [
+  {
+    id: 'vorpball',
+    name: 'VorpBall',
+    created_by: null,
+    created_at: null,
+    pts: 0.75,
+    drbs: 1.25,
+    orbs: 1.5,
+    asts: 2,
+    stls: 2.5,
+    blks: 2.5,
+    tos: -1,
+    fgm: 1,
+    fga: -0.3,
+    tpm: 1,
+    tpa: -0.2,
+    ftm: 1,
+    fta: -0.6,
+    dbl: null,
+    tpl: null,
+    qpl: 100,
+    fls: null,
+    pt10: 2,
+    rb10: 3,
+    ast10: 5
+  },
+  {
+    id: 'nba',
+    name: 'NBA',
+    created_by: null,
+    created_at: null,
+    pts: null,
+    drbs: 1.2,
+    orbs: 1.2,
+    asts: 1.5,
+    stls: 3,
+    blks: 3,
+    tos: -1,
+    fgm: 2,
+    fga: null,
+    tpm: 1,
+    tpa: null,
+    ftm: null,
+    fta: null,
+    dbl: null,
+    tpl: null,
+    qpl: null,
+    fls: null,
+    pt10: null,
+    rb10: null,
+    ast10: null
+  },
+  {
+    id: 'draftkings',
+    name: 'DraftKings',
+    created_by: null,
+    created_at: null,
+    pts: 1,
+    drbs: 1.25,
+    orbs: 1.25,
+    asts: 1.5,
+    stls: 2,
+    blks: 2,
+    tos: -0.5,
+    fgm: null,
+    fga: null,
+    tpm: 0.5,
+    tpa: null,
+    ftm: null,
+    fta: null,
+    dbl: 1.5,
+    tpl: 3,
+    qpl: null,
+    fls: null,
+    pt10: null,
+    rb10: null,
+    ast10: null
+  }
+];
+
 export default function LeaguePage() {
   const { t } = useTranslations();
-  const [formData, setFormData] = useState({
-    name: '',
-    scoringType: 'head-to-head',
-    teams: '4',
-    draftType: 'snake',
-    draftDate: '',
-    scoring: {
-      pts: 1,
-      drbs: 1.2,
-      orbs: 1.5,
-      asts: 1.5,
-      stls: 2,
-      blks: 2,
-      tos: -1,
-      fgm: 1,
-      fga: -0.5,
-      tpm: 1,
-      tpa: -0.5,
-      ftm: 1,
-      fta: -0.5,
-      dbl: 5,
-      tpl: 10,
-      qpl: 20,
-      fls: -0.5,
-      pt10: 1,
-      rb10: 1,
-      ast10: 1
-    }
+  const [formData, setFormData] = useState(() => {
+    const vorpballTemplate = DEFAULT_TEMPLATES.find(t => t.id === 'vorpball')!;
+    return {
+      name: '',
+      scoringType: 'head-to-head',
+      teams: '4',
+      draftType: 'snake',
+      draftDate: '',
+      scoring: {
+        pts: Number(vorpballTemplate.pts ?? 0),
+        drbs: Number(vorpballTemplate.drbs ?? 0),
+        orbs: Number(vorpballTemplate.orbs ?? 0),
+        asts: Number(vorpballTemplate.asts ?? 0),
+        stls: Number(vorpballTemplate.stls ?? 0),
+        blks: Number(vorpballTemplate.blks ?? 0),
+        tos: Number(vorpballTemplate.tos ?? 0),
+        fgm: Number(vorpballTemplate.fgm ?? 0),
+        fga: Number(vorpballTemplate.fga ?? 0),
+        tpm: Number(vorpballTemplate.tpm ?? 0),
+        tpa: Number(vorpballTemplate.tpa ?? 0),
+        ftm: Number(vorpballTemplate.ftm ?? 0),
+        fta: Number(vorpballTemplate.fta ?? 0),
+        dbl: Number(vorpballTemplate.dbl ?? 0),
+        tpl: Number(vorpballTemplate.tpl ?? 0),
+        qpl: Number(vorpballTemplate.qpl ?? 0),
+        fls: Number(vorpballTemplate.fls ?? 0),
+        pt10: Number(vorpballTemplate.pt10 ?? 0),
+        rb10: Number(vorpballTemplate.rb10 ?? 0),
+        ast10: Number(vorpballTemplate.ast10 ?? 0)
+      }
+    };
   });
-  const [templates, setTemplates] = useState<ScoringTemplate[]>([]);
-  const [selectedTemplate, setSelectedTemplate] = useState<string>('');
+  const [templates, setTemplates] = useState<ScoringTemplate[]>(DEFAULT_TEMPLATES);
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('vorpball');
   const [isLoading, setIsLoading] = useState(true);
+  const [newTemplateName, setNewTemplateName] = useState('');
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
 
   const handleChange = (field: string, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -83,57 +171,28 @@ export default function LeaguePage() {
     }));
   };
 
-  useEffect(() => {
-    async function fetchTemplates() {
-      try {
-        const { data, error } = await supabase
-          .from('scoring_templates')
-          .select('*');
-        
-        if (error) throw error;
-
-        setTemplates(data);
-        
-        // Find and select VorpBall Default template
-        const vorpBallTemplate = data.find(t => t.name === 'VorpBall Default');
-        if (vorpBallTemplate) {
-          setSelectedTemplate(vorpBallTemplate.id);
-          const newFormData = {
-            ...formData,
-            scoring: {
-              pts: Number(vorpBallTemplate.pts ?? 0),
-              drbs: Number(vorpBallTemplate.drbs ?? 0),
-              orbs: Number(vorpBallTemplate.orbs ?? 0),
-              asts: Number(vorpBallTemplate.asts ?? 0),
-              stls: Number(vorpBallTemplate.stls ?? 0),
-              blks: Number(vorpBallTemplate.blks ?? 0),
-              tos: Number(vorpBallTemplate.tos ?? 0),
-              fgm: Number(vorpBallTemplate.fgm ?? 0),
-              fga: Number(vorpBallTemplate.fga ?? 0),
-              tpm: Number(vorpBallTemplate.tpm ?? 0),
-              tpa: Number(vorpBallTemplate.tpa ?? 0),
-              ftm: Number(vorpBallTemplate.ftm ?? 0),
-              fta: Number(vorpBallTemplate.fta ?? 0),
-              dbl: Number(vorpBallTemplate.dbl ?? 0),
-              tpl: Number(vorpBallTemplate.tpl ?? 0),
-              qpl: Number(vorpBallTemplate.qpl ?? 0),
-              fls: Number(vorpBallTemplate.fls ?? 0),
-              pt10: Number(vorpBallTemplate.pt10 ?? 0),
-              rb10: Number(vorpBallTemplate.rb10 ?? 0),
-              ast10: Number(vorpBallTemplate.ast10 ?? 0)
-            }
-          };
-          setFormData(newFormData);
-        }
-      } catch (error) {
-        console.error('Error fetching templates:', error);
-        addToast('Failed to load scoring templates', 'error');
-      } finally {
-        setIsLoading(false);
-      }
+  const fetchCustomTemplates = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('scoring_templates')
+        .select('*')
+        .not('created_by', 'is', null); // Only fetch custom templates
+      
+      if (error) throw error;
+      
+      // Combine default and custom templates
+      setTemplates([...DEFAULT_TEMPLATES, ...(data || [])]);
+    } catch (error) {
+      console.error('Error fetching custom templates:', error);
+      addToast('Failed to load custom templates', 'error');
+    } finally {
+      setIsLoading(false);
     }
+  };
 
-    fetchTemplates();
+  useEffect(() => {
+    // Only fetch custom templates on mount
+    fetchCustomTemplates();
   }, []);
 
   const handleTemplateChange = (value: string | number) => {
@@ -190,6 +249,66 @@ export default function LeaguePage() {
   };
 
   const hasNonZeroValues = Object.values(formData.scoring).some(value => value !== 0);
+
+  const handleSaveTemplate = async () => {
+    if (!newTemplateName.trim()) {
+      addToast('Please enter a template name', 'error');
+      return;
+    }
+
+    try {
+      setIsSavingTemplate(true);
+
+      // Check if a template with this name already exists
+      const { data: existingTemplates, error: checkError } = await supabase
+        .from('scoring_templates')
+        .select('name, created_by')
+        .eq('name', newTemplateName.trim());
+
+      if (checkError) throw checkError;
+
+      if (existingTemplates?.length > 0) {
+        const template = existingTemplates[0];
+        if (!template.created_by) {
+          addToast('Cannot override default template', 'error');
+          return;
+        }
+        addToast('A template with this name already exists', 'error');
+        return;
+      }
+
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      if (!user) {
+        addToast('You must be logged in to save templates', 'error');
+        return;
+      }
+
+      // Save the template
+      const { error: saveError } = await supabase
+        .from('scoring_templates')
+        .insert({
+          name: newTemplateName.trim(),
+          created_by: user.id,
+          created_at: new Date().toISOString(),
+          ...formData.scoring
+        });
+
+      if (saveError) throw saveError;
+
+      addToast('Template saved successfully');
+      setNewTemplateName('');
+      
+      // Refresh templates
+      fetchCustomTemplates();
+    } catch (error) {
+      console.error('Error saving template:', error);
+      addToast('Failed to save template', 'error');
+    } finally {
+      setIsSavingTemplate(false);
+    }
+  };
 
   return (
     <div className="p-8">
@@ -274,12 +393,12 @@ export default function LeaguePage() {
           {/* Scoring Settings Section */}
           <div>
             <div className="px-8 py-5 border-y border-gray-200 dark:border-gray-700">
-              <div className="flex items-center gap-4">
+              <div className="flex items-center justify-between gap-4">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                   {t('league.create.form.sections.scoring.title')}
                 </h2>
-                <div className="flex items-center gap-2">
-                  <div className="w-96 mt-2 relative z-20">
+                <div className="flex flex-row flex-wrap items-start gap-2 flex-1 min-w-0">
+                  <div className="w-64 max-w-full mt-2 relative z-20">
                     <Select
                       label="Template"
                       value={selectedTemplate}
@@ -300,6 +419,27 @@ export default function LeaguePage() {
                       Clear All
                     </Button>
                   )}
+                  <div className="flex-1" />
+                  <div className="flex items-center gap-2">
+                    <Input
+                      label="Custom Template"
+                      placeholder="Enter template name"
+                      value={newTemplateName}
+                      onChange={(e) => setNewTemplateName(e.target.value.slice(0, 24))}
+                      className="w-64 max-w-full mt-2"
+                      maxLength={24}
+                    />
+                    <Button
+                      variant="affirmative"
+                      size="sm"
+                      onClick={handleSaveTemplate}
+                      disabled={isSavingTemplate || !newTemplateName.trim()}
+                      isLoading={isSavingTemplate}
+                      className="mt-2"
+                    >
+                      Save
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
