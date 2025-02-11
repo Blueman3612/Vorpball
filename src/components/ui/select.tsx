@@ -27,9 +27,11 @@ export function Select({
   ...props
 }: SelectProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const selectedOption = options.find(option => option.value === value);
+  const showFloatingLabel = isFocused || value != null;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -37,6 +39,7 @@ export function Select({
     function handleClickOutside(event: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
+        setIsFocused(false);
       }
     }
 
@@ -62,10 +65,12 @@ export function Select({
           if (isOpen) {
             onChange?.(options[highlightedIndex].value);
             setIsOpen(false);
+            setIsFocused(false);
           }
           break;
         case 'Escape':
           setIsOpen(false);
+          setIsFocused(false);
           break;
       }
     }
@@ -81,38 +86,61 @@ export function Select({
 
   return (
     <div className="w-full" {...props}>
-      {label && (
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-          {label}
-        </label>
-      )}
-      <div 
-        ref={containerRef}
-        className="relative"
-      >
+      <div className="relative" ref={containerRef}>
+        {label && (
+          <label
+            className={cn(
+              'absolute left-3 transition-all duration-200 pointer-events-none',
+              'origin-left',
+              showFloatingLabel
+                ? '-top-5 text-sm text-primary-600 dark:text-primary-400'
+                : 'top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400',
+              error && '!text-error-500',
+              disabled && 'text-gray-400 dark:text-gray-500'
+            )}
+          >
+            {label}
+          </label>
+        )}
         <button
           type="button"
-          onClick={() => !disabled && setIsOpen(prev => !prev)}
+          onClick={() => {
+            if (!disabled) {
+              setIsOpen(prev => !prev);
+              setIsFocused(true);
+            }
+          }}
+          onBlur={() => {
+            if (!isOpen) {
+              setIsFocused(false);
+            }
+          }}
           className={cn(
-            'w-full px-4 py-2',
+            'w-full px-3 h-10',
             'bg-white dark:bg-gray-900',
             'text-left text-gray-900 dark:text-white',
-            'border border-gray-300 dark:border-gray-700',
-            'rounded-lg',
+            'border rounded-lg',
             'focus:outline-none focus:ring-2',
-            'focus:ring-primary-400 dark:focus:ring-primary-400',
             'disabled:opacity-50 disabled:cursor-not-allowed',
             'transition-colors duration-200',
             'flex items-center justify-between',
-            error && 'border-error-500 focus:ring-error-400',
-            isOpen && 'ring-2 ring-primary-400',
+            error
+              ? 'border-error-500 focus:ring-error-400/20'
+              : cn(
+                  'border-gray-300 dark:border-gray-700',
+                  'hover:border-gray-400 dark:hover:border-gray-600',
+                  'focus:border-primary-500 focus:ring-primary-400/20'
+                ),
             className
           )}
           disabled={disabled}
           aria-haspopup="listbox"
           aria-expanded={isOpen}
         >
-          <span className="block truncate">
+          <span className={cn(
+            "block truncate",
+            !selectedOption?.label && "text-gray-500"
+          )}>
             {selectedOption?.label || 'Select an option'}
           </span>
           <ChevronUpDownIcon 
@@ -142,7 +170,7 @@ export function Select({
               <li
                 key={option.value}
                 className={cn(
-                  'px-4 py-2 cursor-pointer',
+                  'px-3 py-2 cursor-pointer',
                   'text-gray-900 dark:text-white',
                   'hover:bg-primary-50 dark:hover:bg-primary-900/20',
                   'transition-colors duration-150',
@@ -154,6 +182,7 @@ export function Select({
                 onClick={() => {
                   onChange?.(option.value);
                   setIsOpen(false);
+                  setIsFocused(false);
                 }}
                 role="option"
                 aria-selected={option.value === value}
@@ -172,7 +201,7 @@ export function Select({
         )}
       </div>
       {error && (
-        <p className="mt-1 text-sm text-error-500">{error}</p>
+        <p className="mt-1.5 text-sm text-error-500">{error}</p>
       )}
     </div>
   );

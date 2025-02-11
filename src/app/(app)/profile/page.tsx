@@ -12,6 +12,7 @@ import { PencilIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/solid
 import { useAuth } from '@/contexts/AuthContext';
 import { useTranslations } from '@/lib/i18n';
 import { LanguageSelector } from '@/components/LanguageSelector';
+import { Input } from '@/components/ui/input';
 
 interface Profile {
   id: string;
@@ -297,41 +298,29 @@ export default function ProfilePage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
         {/* Account Settings */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden h-fit">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
               {t('profile.sections.accountSettings.title')}
             </h3>
           </div>
-          <div className="p-6 space-y-6">
+          <div className="p-8 space-y-8">
             {/* Name */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('profile.sections.accountSettings.fields.fullName.label')}
-              </label>
-              <input
-                type="text"
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-                value={getValue('full_name') || ''}
-                onChange={(e) => handleChange({ full_name: e.target.value })}
-              />
-            </div>
+            <Input
+              label={t('profile.sections.accountSettings.fields.fullName.label')}
+              value={getValue('full_name') || ''}
+              onChange={(e) => handleChange({ full_name: e.target.value })}
+            />
 
             {/* Username */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('profile.sections.accountSettings.fields.username.label')}
-              </label>
-              <input
-                type="text"
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-                value={getValue('username') || ''}
-                onChange={(e) => handleChange({ username: e.target.value })}
-              />
-            </div>
+            <Input
+              label={t('profile.sections.accountSettings.fields.username.label')}
+              value={getValue('username') || ''}
+              onChange={(e) => handleChange({ username: e.target.value })}
+            />
 
             {/* Save/Cancel Buttons */}
             {hasChanges && (
-              <div className="pt-4 border-t border-gray-200 dark:border-gray-700 flex gap-4 justify-end">
+              <div className="pt-6 border-t border-gray-200 dark:border-gray-700 flex gap-4 justify-end">
                 <Button
                   onClick={handleCancel}
                   variant="outline"
@@ -353,12 +342,12 @@ export default function ProfilePage() {
 
         {/* Preferences */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden h-fit">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
               {t('profile.sections.preferences.title')}
             </h3>
           </div>
-          <div className="p-6 space-y-6">
+          <div className="p-8 space-y-8">
             {/* Email Notifications */}
             <div className="flex items-center justify-between">
               <div>
