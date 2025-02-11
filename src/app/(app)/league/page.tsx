@@ -9,6 +9,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { addToast, ToastContainer } from "@/components/ui/toast";
 import { ConfirmationModal } from "@/components/ui/modal";
+import { Toggle } from "@/components/ui/toggle";
 
 interface ScoringTemplate {
   id: string;
@@ -118,6 +119,28 @@ const DEFAULT_TEMPLATES: ScoringTemplate[] = [
   }
 ];
 
+const DEFAULT_ROSTER = {
+  pg: 1,
+  sg: 1,
+  sf: 1,
+  pf: 1,
+  c: 1,
+  g: 1,
+  f: 1,
+  gf: 0,
+  fc: 0,
+  util: 4,
+  bench: 4,
+  ir: 2
+};
+
+const DEFAULT_DYNASTY = {
+  enabled: false,
+  keepers: 6,
+  salaryIncrease: 5,
+  rookiesExempt: true
+};
+
 export default function LeaguePage() {
   const { t } = useTranslations();
   const [formData, setFormData] = useState(() => {
@@ -128,6 +151,8 @@ export default function LeaguePage() {
       teams: 10,
       draftType: 'snake',
       draftDate: '',
+      roster: { ...DEFAULT_ROSTER },
+      dynasty: { ...DEFAULT_DYNASTY },
       scoring: {
         pts: Number(vorpballTemplate.pts ?? 0),
         drbs: Number(vorpballTemplate.drbs ?? 0),
@@ -163,6 +188,10 @@ export default function LeaguePage() {
   const customTemplates = templates.filter(t => t.created_by !== null);
   const hasReachedTemplateLimit = customTemplates.length >= 5;
 
+  const hasRosterChanges = Object.entries(formData.roster).some(
+    ([key, value]) => value !== DEFAULT_ROSTER[key as keyof typeof DEFAULT_ROSTER]
+  );
+
   const handleChange = (field: string, value: string | number) => {
     if (field === 'teams' && (value === '' || value === 0)) {
       setFormData(prev => ({ ...prev, [field]: 10 }));
@@ -177,6 +206,26 @@ export default function LeaguePage() {
       scoring: {
         ...prev.scoring,
         [stat]: value
+      }
+    }));
+  };
+
+  const handleRosterChange = (position: keyof typeof formData.roster, value: number) => {
+    setFormData(prev => ({
+      ...prev,
+      roster: {
+        ...prev.roster,
+        [position]: value
+      }
+    }));
+  };
+
+  const handleDynastyChange = (field: keyof typeof DEFAULT_DYNASTY, value: number | boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      dynasty: {
+        ...prev.dynasty,
+        [field]: value
       }
     }));
   };
@@ -217,6 +266,8 @@ export default function LeaguePage() {
       teams: formData.teams,
       draftType: formData.draftType,
       draftDate: formData.draftDate,
+      roster: formData.roster,
+      dynasty: formData.dynasty,
       scoring: {
         pts: Number(template.pts ?? 0),
         drbs: Number(template.drbs ?? 0),
@@ -393,6 +444,13 @@ export default function LeaguePage() {
     } finally {
       setIsSavingTemplate(false);
     }
+  };
+
+  const handleResetRoster = () => {
+    setFormData(prev => ({
+      ...prev,
+      roster: { ...DEFAULT_ROSTER }
+    }));
   };
 
   return (
@@ -782,29 +840,246 @@ export default function LeaguePage() {
           {/* Roster Settings Section */}
           <div>
             <div className="px-8 py-5 border-y border-gray-200 dark:border-gray-700">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {t('league.create.form.sections.roster.title')}
-              </h2>
-            </div>
-            <div className="p-8">
-              <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-6">
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {t('league.create.form.sections.roster.defaultSettings')}
-                </p>
-                <ul className="mt-4 text-sm text-gray-700 dark:text-gray-300 space-y-2">
-                  <li>• {t('league.create.form.sections.roster.positions.pg')}, {t('league.create.form.sections.roster.positions.sg')}, {t('league.create.form.sections.roster.positions.sf')}, {t('league.create.form.sections.roster.positions.pf')}, {t('league.create.form.sections.roster.positions.c')}</li>
-                  <li>• {t('league.create.form.sections.roster.spots.bench', { count: 3 })}</li>
-                  <li>• {t('league.create.form.sections.roster.spots.ir', { count: 2 })}</li>
-                </ul>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-4"
-                >
-                  {t('league.create.form.sections.roster.customize')}
-                </Button>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    {t('league.create.form.sections.roster.title')}
+                  </h2>
+                  {(formData.roster.pg + formData.roster.sg + formData.roster.sf + 
+                    formData.roster.pf + formData.roster.c + formData.roster.g + 
+                    formData.roster.f + formData.roster.gf + formData.roster.fc + 
+                    formData.roster.util) === 0 ? (
+                    <div className="flex items-center gap-1.5 text-error-500 dark:text-error-400">
+                      <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
+                      </svg>
+                      <span className="text-sm font-medium">Must Have At Least 1 Active Roster Spot</span>
+                    </div>
+                  ) : (formData.roster.pg + formData.roster.sg + formData.roster.sf + 
+                    formData.roster.pf + formData.roster.c + formData.roster.g + 
+                    formData.roster.f + formData.roster.gf + formData.roster.fc + 
+                    formData.roster.util + formData.roster.bench) !== 15 && (
+                    <div className="flex items-center gap-1.5 text-warning-500 dark:text-warning-600">
+                      <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                      </svg>
+                      <span className="text-sm font-medium">15 Roster Spots Highly Recommended</span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-6 text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-500 dark:text-gray-400">Active:</span>
+                    <span className="font-medium text-gray-900 dark:text-white">
+                      {formData.roster.pg + formData.roster.sg + formData.roster.sf + 
+                       formData.roster.pf + formData.roster.c + formData.roster.g + 
+                       formData.roster.f + formData.roster.gf + formData.roster.fc + 
+                       formData.roster.util}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-500 dark:text-gray-400">Inactive:</span>
+                    <span className="font-medium text-gray-900 dark:text-white">
+                      {formData.roster.bench}
+                    </span>
+                  </div>
+                  {hasRosterChanges && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleResetRoster}
+                    >
+                      Reset
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
+            <div className="p-8">
+              <div className="grid gap-6 grid-cols-[repeat(auto-fit,minmax(90px,1fr))]">
+                <NumberInput
+                  label="PG"
+                  value={formData.roster.pg}
+                  onChange={(value) => handleRosterChange('pg', value)}
+                  min={0}
+                  max={99}
+                  step={1}
+                  defaultEmptyValue={0}
+                  minWidth="90px"
+                />
+                <NumberInput
+                  label="SG"
+                  value={formData.roster.sg}
+                  onChange={(value) => handleRosterChange('sg', value)}
+                  min={0}
+                  max={99}
+                  step={1}
+                  defaultEmptyValue={0}
+                  minWidth="90px"
+                />
+                <NumberInput
+                  label="SF"
+                  value={formData.roster.sf}
+                  onChange={(value) => handleRosterChange('sf', value)}
+                  min={0}
+                  max={99}
+                  step={1}
+                  defaultEmptyValue={0}
+                  minWidth="90px"
+                />
+                <NumberInput
+                  label="PF"
+                  value={formData.roster.pf}
+                  onChange={(value) => handleRosterChange('pf', value)}
+                  min={0}
+                  max={99}
+                  step={1}
+                  defaultEmptyValue={0}
+                  minWidth="90px"
+                />
+                <NumberInput
+                  label="C"
+                  value={formData.roster.c}
+                  onChange={(value) => handleRosterChange('c', value)}
+                  min={0}
+                  max={99}
+                  step={1}
+                  defaultEmptyValue={0}
+                  minWidth="90px"
+                />
+                <NumberInput
+                  label="G"
+                  value={formData.roster.g}
+                  onChange={(value) => handleRosterChange('g', value)}
+                  min={0}
+                  max={99}
+                  step={1}
+                  defaultEmptyValue={0}
+                  minWidth="90px"
+                />
+                <NumberInput
+                  label="F"
+                  value={formData.roster.f}
+                  onChange={(value) => handleRosterChange('f', value)}
+                  min={0}
+                  max={99}
+                  step={1}
+                  defaultEmptyValue={0}
+                  minWidth="90px"
+                />
+                <NumberInput
+                  label="G/F"
+                  value={formData.roster.gf}
+                  onChange={(value) => handleRosterChange('gf', value)}
+                  min={0}
+                  max={99}
+                  step={1}
+                  defaultEmptyValue={0}
+                  minWidth="90px"
+                />
+                <NumberInput
+                  label="F/C"
+                  value={formData.roster.fc}
+                  onChange={(value) => handleRosterChange('fc', value)}
+                  min={0}
+                  max={99}
+                  step={1}
+                  defaultEmptyValue={0}
+                  minWidth="90px"
+                />
+                <NumberInput
+                  label="UTIL"
+                  value={formData.roster.util}
+                  onChange={(value) => handleRosterChange('util', value)}
+                  min={0}
+                  max={99}
+                  step={1}
+                  defaultEmptyValue={0}
+                  minWidth="90px"
+                />
+                <NumberInput
+                  label="Bench"
+                  value={formData.roster.bench}
+                  onChange={(value) => handleRosterChange('bench', value)}
+                  min={0}
+                  max={99}
+                  step={1}
+                  defaultEmptyValue={0}
+                  minWidth="90px"
+                />
+                <NumberInput
+                  label="IR"
+                  value={formData.roster.ir}
+                  onChange={(value) => handleRosterChange('ir', value)}
+                  min={0}
+                  max={99}
+                  step={1}
+                  defaultEmptyValue={0}
+                  minWidth="90px"
+                />
+              </div>
+        </div>
+      </div>
+
+          {/* Dynasty League Section */}
+          <div>
+            <div className="px-8 py-5 border-y border-gray-200 dark:border-gray-700">
+              <div className="flex items-center gap-3">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Dynasty League
+                </h2>
+                <Toggle
+                  checked={formData.dynasty?.enabled ?? false}
+                  onChange={(checked) => handleDynastyChange('enabled', checked)}
+                  size="sm"
+                />
+              </div>
+            </div>
+            {formData.dynasty?.enabled && (
+              <div className="p-8">
+                <div className="flex flex-wrap items-center gap-8">
+                  <div className="w-[140px]">
+                    <NumberInput
+                      label="Keepers"
+                      value={formData.dynasty?.keepers ?? 6}
+                      onChange={(value) => handleDynastyChange('keepers', value)}
+                      min={0}
+                      max={formData.roster.pg + formData.roster.sg + formData.roster.sf + 
+                           formData.roster.pf + formData.roster.c + formData.roster.g + 
+                           formData.roster.f + formData.roster.gf + formData.roster.fc + 
+                           formData.roster.util + formData.roster.bench}
+                      step={1}
+                      defaultEmptyValue={0}
+                      minWidth="140px"
+                    />
+                  </div>
+                  <div className="w-[240px]">
+                    <NumberInput
+                      label="Salary Increase"
+                      value={formData.dynasty?.salaryIncrease ?? 5}
+                      onChange={(value) => handleDynastyChange('salaryIncrease', value)}
+                      min={0}
+                      max={100}
+                      step={1}
+                      defaultEmptyValue={0}
+                      minWidth="240px"
+                    />
+                  </div>
+                  <div className="flex items-center gap-3 min-w-[200px]">
+                    <Toggle
+                      checked={formData.dynasty?.rookiesExempt ?? true}
+                      onChange={(checked) => handleDynastyChange('rookiesExempt', checked)}
+                      size="md"
+                    />
+                    <div>
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                        Rookies Exempt From Salary Increase
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Action Buttons */}
@@ -819,7 +1094,7 @@ export default function LeaguePage() {
             >
               {t('common.actions.create')}
             </Button>
-          </div>
+        </div>
         </div>
       </div>
     </div>

@@ -12,6 +12,7 @@ interface NumberInputProps extends Omit<React.InputHTMLAttributes<HTMLInputEleme
   error?: string;
   showClearButton?: boolean;
   defaultEmptyValue?: number;
+  minWidth?: string;
 }
 
 export function NumberInput({
@@ -27,6 +28,7 @@ export function NumberInput({
   required,
   showClearButton = true,
   defaultEmptyValue,
+  minWidth = '180px',
   ...props
 }: NumberInputProps) {
   const [isFocused, setIsFocused] = useState(false);
@@ -178,7 +180,8 @@ export function NumberInput({
             disabled={disabled}
             maxLength={6}
             className={cn(
-              'block w-full min-w-[180px] transition-all duration-200',
+              'block w-full transition-all duration-200',
+              `min-w-[${minWidth}]`,
               'pl-8 pr-8 h-10',
               'bg-white dark:bg-gray-900',
               'text-gray-900 dark:text-white text-center',
