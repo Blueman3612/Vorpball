@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { cn, getThemeColorClass } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { ChevronUpDownIcon } from '@heroicons/react/24/outline';
 
 interface SelectOption {

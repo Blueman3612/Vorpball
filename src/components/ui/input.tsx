@@ -1,5 +1,5 @@
 import { InputHTMLAttributes, useState } from 'react';
-import { cn, getThemeColorClass } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { PencilIcon } from '@heroicons/react/24/outline';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
