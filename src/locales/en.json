@@ -10,7 +10,9 @@
       "signOut": "Sign out",
       "upload": "Upload",
       "saveChanges": "Save Changes",
-      "savingChanges": "Saving Changes..."
+      "savingChanges": "Saving Changes...",
+      "clearAll": "Clear All",
+      "reset": "Reset"
     },
     "navigation": {
       "league": "League",
@@ -22,7 +24,8 @@
     "states": {
       "loading": "Loading...",
       "saving": "Saving...",
-      "uploading": "Uploading..."
+      "uploading": "Uploading...",
+      "creating": "Creating..."
     },
     "errors": {
       "notFound": "Not found",
@@ -42,6 +45,21 @@
       "title": "Language",
       "description": "Select your preferred language",
       "en": "English"
+    },
+    "labels": {
+      "template": "Template",
+      "customTemplate": "Custom Template",
+      "public": "Public"
+    },
+    "placeholders": {
+      "enterTemplateName": "Enter template name"
+    },
+    "validation": {
+      "required": "Required",
+      "templateLimitReached": "Custom template limit reached (5/5)",
+      "atLeastOneRequired": "At Least 1 Category Required",
+      "recommendedRosterSize": "15 Roster Spots Highly Recommended",
+      "atLeastOneActiveSpot": "Must Have At Least 1 Active Roster Spot"
     }
   },
   "auth": {
@@ -92,10 +110,6 @@
             "leagueName": {
               "label": "League Name",
               "placeholder": "Enter league name"
-            },
-            "description": {
-              "label": "Description",
-              "placeholder": "Describe your league"
             }
           },
           "settings": {
@@ -103,9 +117,9 @@
             "scoringType": {
               "label": "Scoring Type",
               "options": {
-                "headToHead": "Head-to-Head",
+                "category": "Category",
                 "points": "Points",
-                "roto": "Roto"
+                "both": "Both"
               }
             },
             "teams": {
@@ -126,24 +140,94 @@
           },
           "scoring": {
             "title": "Scoring Settings",
-            "description": "Configure how many fantasy points each statistic is worth"
+            "description": "Configure how many fantasy points each statistic is worth",
+            "stats": {
+              "pts": "Point",
+              "drbs": "D Rebound",
+              "orbs": "O Rebound",
+              "asts": "Assist",
+              "stls": "Steal",
+              "blks": "Block",
+              "tos": "Turnover",
+              "fgm": "FG Make",
+              "fga": "FG Attempt",
+              "tpm": "3P Make",
+              "tpa": "3P Attempt",
+              "ftm": "FT Make",
+              "fta": "FT Attempt",
+              "dbl": "Dbl Dbl",
+              "tpl": "Trp Dbl",
+              "qpl": "Quad Dbl",
+              "fls": "Foul",
+              "pt10": "10+ PTS",
+              "rb10": "10+ REB",
+              "ast10": "10+ AST"
+            }
           },
           "roster": {
             "title": "Roster Settings",
-            "defaultSettings": "Default roster settings will be used:",
             "positions": {
               "pg": "PG",
               "sg": "SG",
               "sf": "SF",
               "pf": "PF",
-              "c": "C"
+              "c": "C",
+              "g": "G",
+              "f": "F",
+              "gf": "G/F",
+              "fc": "F/C",
+              "util": "UTIL",
+              "bench": "Bench",
+              "ir": "IR"
             },
-            "spots": {
-              "bench": "{count} Bench spots",
-              "ir": "{count} IR spots"
-            },
-            "customize": "Customize Roster Settings"
+            "stats": {
+              "active": "Active",
+              "inactive": "Inactive"
+            }
+          },
+          "dynasty": {
+            "title": "Dynasty League",
+            "settings": {
+              "keepers": "Keepers",
+              "salaryIncrease": "Salary Increase",
+              "rookiesExempt": "Rookies Exempt From Salary Increase"
+            }
           }
+        }
+      },
+      "templates": {
+        "save": {
+          "success": "Template saved successfully",
+          "error": {
+            "nameRequired": "Please enter a template name",
+            "loginRequired": "You must be logged in to save templates",
+            "limitReached": "You have reached the maximum limit of 5 custom templates",
+            "matchesDefault": "Cannot save - matches default template \"{name}\"",
+            "nameExists": "A template with this name already exists",
+            "cannotOverrideDefault": "Cannot override default template",
+            "generic": "Failed to save template"
+          }
+        },
+        "delete": {
+          "title": "Delete Template",
+          "description": "Are you sure you want to delete \"{name}\"? This action cannot be undone.",
+          "success": "Template deleted successfully",
+          "error": {
+            "loginRequired": "You must be logged in to delete templates",
+            "notOwner": "You can only delete your own templates",
+            "generic": "Failed to delete template"
+          }
+        }
+      },
+      "creation": {
+        "validation": {
+          "nameRequired": "League name is required",
+          "resolveWarnings": "Please resolve all warnings before creating the league"
+        },
+        "success": "League created successfully!",
+        "error": {
+          "generic": "Failed to create league. Please try again.",
+          "loginRequired": "You must be logged in to create a league"
         }
       }
     }
