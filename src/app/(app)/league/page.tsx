@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabase/client";
 import { addToast, ToastContainer } from "@/components/ui/toast";
 import { ConfirmationModal } from "@/components/ui/modal";
 import { Toggle } from "@/components/ui/toggle";
+import { cn } from "@/lib/utils";
 
 interface ScoringTemplate {
   id: string;
@@ -141,12 +142,46 @@ const DEFAULT_DYNASTY = {
   rookiesExempt: true
 };
 
+interface FormData {
+  name: string;
+  public: boolean;
+  scoringType: string;
+  teams: number;
+  draftType: string;
+  draftDate: string;
+  roster: typeof DEFAULT_ROSTER;
+  dynasty: typeof DEFAULT_DYNASTY;
+  scoring: {
+    pts: number;
+    drbs: number;
+    orbs: number;
+    asts: number;
+    stls: number;
+    blks: number;
+    tos: number;
+    fgm: number;
+    fga: number;
+    tpm: number;
+    tpa: number;
+    ftm: number;
+    fta: number;
+    dbl: number;
+    tpl: number;
+    qpl: number;
+    fls: number;
+    pt10: number;
+    rb10: number;
+    ast10: number;
+  };
+}
+
 export default function LeaguePage() {
   const { t } = useTranslations();
-  const [formData, setFormData] = useState(() => {
+  const [formData, setFormData] = useState<FormData>(() => {
     const vorpballTemplate = DEFAULT_TEMPLATES.find(t => t.id === 'vorpball')!;
-    return {
+    const initialData: FormData = {
       name: '',
+      public: false,
       scoringType: 'head-to-head',
       teams: 10,
       draftType: 'snake',
@@ -176,6 +211,7 @@ export default function LeaguePage() {
         ast10: Number(vorpballTemplate.ast10 ?? 0)
       }
     };
+    return initialData;
   });
   const [templates, setTemplates] = useState<ScoringTemplate[]>(DEFAULT_TEMPLATES);
   const [selectedTemplate, setSelectedTemplate] = useState<string>('vorpball');
@@ -191,7 +227,7 @@ export default function LeaguePage() {
     ([key, value]) => value !== DEFAULT_ROSTER[key as keyof typeof DEFAULT_ROSTER]
   );
 
-  const handleChange = (field: string, value: string | number) => {
+  const handleChange = (field: string, value: string | number | boolean) => {
     if (field === 'teams' && (value === '' || value === 0)) {
       setFormData(prev => ({ ...prev, [field]: 10 }));
       return;
@@ -252,19 +288,20 @@ export default function LeaguePage() {
   }, []);
 
   const handleTemplateChange = (value: string | number) => {
-    const templateId = String(value);
-    setSelectedTemplate(templateId);
-    const template = templates.find(t => t.id === templateId);
+    const template = templates.find(t => t.id === value);
     if (!template) return;
 
-    const newFormData = {
-      name: formData.name,
-      scoringType: formData.scoringType,
-      teams: formData.teams,
-      draftType: formData.draftType,
-      draftDate: formData.draftDate,
-      roster: formData.roster,
-      dynasty: formData.dynasty,
+    setSelectedTemplate(template.id);
+    setFormData(prev => ({
+      ...prev,
+      name: prev.name,
+      public: prev.public,
+      scoringType: prev.scoringType,
+      teams: prev.teams,
+      draftType: prev.draftType,
+      draftDate: prev.draftDate,
+      roster: prev.roster,
+      dynasty: prev.dynasty,
       scoring: {
         pts: Number(template.pts ?? 0),
         drbs: Number(template.drbs ?? 0),
@@ -287,23 +324,43 @@ export default function LeaguePage() {
         rb10: Number(template.rb10 ?? 0),
         ast10: Number(template.ast10 ?? 0)
       }
-    };
-
-    setFormData(newFormData);
-    addToast(`Loaded "${template.name}" scoring template`);
+    }));
   };
 
   const handleClearAll = () => {
-    const clearedScoring = Object.fromEntries(
-      Object.keys(formData.scoring).map(key => [key, 0])
-    ) as typeof formData.scoring;
-    
     setFormData(prev => ({
       ...prev,
-      scoring: clearedScoring
+      name: prev.name,
+      public: prev.public,
+      scoringType: prev.scoringType,
+      teams: prev.teams,
+      draftType: prev.draftType,
+      draftDate: prev.draftDate,
+      roster: prev.roster,
+      dynasty: prev.dynasty,
+      scoring: {
+        pts: 0,
+        drbs: 0,
+        orbs: 0,
+        asts: 0,
+        stls: 0,
+        blks: 0,
+        tos: 0,
+        fgm: 0,
+        fga: 0,
+        tpm: 0,
+        tpa: 0,
+        ftm: 0,
+        fta: 0,
+        dbl: 0,
+        tpl: 0,
+        qpl: 0,
+        fls: 0,
+        pt10: 0,
+        rb10: 0,
+        ast10: 0
+      }
     }));
-    setSelectedTemplate('');
-    addToast('All scoring values cleared');
   };
 
   const hasNonZeroValues = Object.values(formData.scoring).some(value => value !== 0);
@@ -446,7 +503,15 @@ export default function LeaguePage() {
   const handleResetRoster = () => {
     setFormData(prev => ({
       ...prev,
-      roster: { ...DEFAULT_ROSTER }
+      name: prev.name,
+      public: prev.public,
+      scoringType: prev.scoringType,
+      teams: prev.teams,
+      draftType: prev.draftType,
+      draftDate: prev.draftDate,
+      roster: { ...DEFAULT_ROSTER },
+      dynasty: prev.dynasty,
+      scoring: prev.scoring
     }));
   };
 
@@ -464,634 +529,635 @@ export default function LeaguePage() {
         isDestructive={true}
         isLoading={isDeletingTemplate}
       />
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          {t('league.create.title')}
-        </h1>
-        <p className="text-gray-500 dark:text-gray-400">
-          {t('league.create.description')}
-        </p>
-      </div>
+      <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-8">
+        {t('league.create.title')}
+      </h1>
 
-      {/* League Creation Form */}
-      <div className="max-w-full bg-white dark:bg-gray-800 rounded-xl shadow-sm">
-        <div className="space-y-0">
-          {/* League Info Section */}
-          <div>
-            <div className="px-8 py-5 border-b border-gray-200 dark:border-gray-700">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {t('league.create.form.sections.info.title')}
-              </h2>
-            </div>
-            <div className="p-8">
-              <Input
-                label={t('league.create.form.sections.info.leagueName.label')}
-                placeholder={t('league.create.form.sections.info.leagueName.placeholder')}
-                value={formData.name}
-                onChange={(e) => handleChange('name', e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* League Settings Section */}
-          <div>
-            <div className="px-8 py-5 border-y border-gray-200 dark:border-gray-700">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {t('league.create.form.sections.settings.title')}
-              </h2>
-            </div>
-            <div className="p-8">
-              <div className="grid gap-8 md:grid-cols-2">
-                <Select
-                  label={t('league.create.form.sections.settings.scoringType.label')}
-                  value={formData.scoringType}
-                  onChange={(value) => handleChange('scoringType', value)}
-                  options={[
-                    { value: 'head-to-head', label: t('league.create.form.sections.settings.scoringType.options.headToHead') },
-                    { value: 'points', label: t('league.create.form.sections.settings.scoringType.options.points') },
-                    { value: 'roto', label: t('league.create.form.sections.settings.scoringType.options.roto') }
-                  ]}
-                />
-                <NumberInput
-                  label={t('league.create.form.sections.settings.teams.label')}
-                  value={Number(formData.teams)}
-                  onChange={(value) => handleChange('teams', value)}
-                  min={2}
-                  max={16}
-                  step={1}
-                  showClearButton={false}
-                  defaultEmptyValue={10}
-                />
-                <Select
-                  label={t('league.create.form.sections.settings.draftType.label')}
-                  value={formData.draftType}
-                  onChange={(value) => handleChange('draftType', value)}
-                  options={[
-                    { value: 'snake', label: t('league.create.form.sections.settings.draftType.options.snake') },
-                    { value: 'auction', label: t('league.create.form.sections.settings.draftType.options.auction') },
-                    { value: 'linear', label: t('league.create.form.sections.settings.draftType.options.linear') }
-                  ]}
-                />
+      <div>
+        {/* League Name and Public Toggle */}
+        <div>
+          <div className="px-8 py-5">
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
                 <Input
-                  type="datetime-local"
-                  label={t('league.create.form.sections.settings.draftDate.label')}
-                  value={formData.draftDate}
-                  onChange={(e) => handleChange('draftDate', e.target.value)}
+                  label={t('league.create.form.sections.info.leagueName.label')}
+                  placeholder={t('league.create.form.sections.info.leagueName.placeholder')}
+                  value={formData.name}
+                  onChange={(e) => handleChange('name', e.target.value)}
                 />
               </div>
-            </div>
-          </div>
-
-          {/* Scoring Settings Section */}
-          <div>
-            <div className="px-8 py-5 border-y border-gray-200 dark:border-gray-700">
-              <div className="flex items-center justify-between gap-4">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {t('league.create.form.sections.scoring.title')}
-                </h2>
-                <div className="flex flex-row flex-wrap items-start gap-2 flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <div className="w-64 max-w-full mt-2 relative z-20">
-                      <Select
-                        label="Template"
-                        value={selectedTemplate}
-                        onChange={handleTemplateChange}
-                        options={templates.map(template => ({
-                          value: template.id,
-                          label: (
-                            <div className="flex items-center justify-between w-full">
-                              <span>{template.name}</span>
-                              {template.created_by && (
-                                <div
-                                  role="button"
-                                  tabIndex={0}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const selectedTemplate = templates.find(t => t.id === template.id);
-                                    if (!selectedTemplate) return;
-                                    setTemplateToDelete(selectedTemplate);
-                                  }}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter' || e.key === ' ') {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      const selectedTemplate = templates.find(t => t.id === template.id);
-                                      if (!selectedTemplate) return;
-                                      setTemplateToDelete(selectedTemplate);
-                                    }
-                                  }}
-                                  className="p-1 text-gray-400 hover:text-error-500 dark:text-gray-500 dark:hover:text-error-500 transition-colors ml-auto cursor-pointer"
-                                >
-                                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m4-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                  </svg>
-                                </div>
-                              )}
-                            </div>
-                          )
-                        }))}
-                      />
-                    </div>
-                  </div>
-                  {hasNonZeroValues && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleClearAll}
-                      className="mt-2"
-                    >
-                      Clear All
-                    </Button>
-                  )}
-                  <div className="flex-1" />
-                  <div className="flex items-center gap-2">
-                    <Input
-                      label="Custom Template"
-                      placeholder="Enter template name"
-                      value={hasReachedTemplateLimit ? "Custom template limit reached (5/5)" : newTemplateName}
-                      onChange={(e) => setNewTemplateName(e.target.value.slice(0, 24))}
-                      className="w-64 max-w-full mt-2"
-                      maxLength={24}
-                      disabled={hasReachedTemplateLimit}
-                    />
-                    <Button
-                      variant="affirmative"
-                      size="sm"
-                      onClick={handleSaveTemplate}
-                      disabled={isSavingTemplate || !newTemplateName.trim() || hasReachedTemplateLimit}
-                      isLoading={isSavingTemplate}
-                      className="mt-2"
-                    >
-                      Save
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="p-8">
-              <div className="grid gap-6 grid-cols-[repeat(auto-fit,minmax(180px,1fr))]">
-                <NumberInput
-                  key={`pts-${selectedTemplate}`}
-                  label="Point"
-                  value={formData.scoring.pts}
-                  onChange={(value) => handleScoringChange('pts', value)}
-                  min={-100}
-                  max={100}
-                  step={0.05}
-                  defaultEmptyValue={0}
-                />
-                <NumberInput
-                  key={`drbs-${selectedTemplate}`}
-                  label="D Rebound"
-                  value={formData.scoring.drbs}
-                  onChange={(value) => handleScoringChange('drbs', value)}
-                  min={-100}
-                  max={100}
-                  step={0.05}
-                  defaultEmptyValue={0}
-                />
-                <NumberInput
-                  key={`orbs-${selectedTemplate}`}
-                  label="O Rebound"
-                  value={formData.scoring.orbs}
-                  onChange={(value) => handleScoringChange('orbs', value)}
-                  min={-100}
-                  max={100}
-                  step={0.05}
-                  defaultEmptyValue={0}
-                />
-                <NumberInput
-                  key={`asts-${selectedTemplate}`}
-                  label="Assist"
-                  value={formData.scoring.asts}
-                  onChange={(value) => handleScoringChange('asts', value)}
-                  min={-100}
-                  max={100}
-                  step={0.05}
-                  defaultEmptyValue={0}
-                />
-                <NumberInput
-                  key={`stls-${selectedTemplate}`}
-                  label="Steal"
-                  value={formData.scoring.stls}
-                  onChange={(value) => handleScoringChange('stls', value)}
-                  min={-100}
-                  max={100}
-                  step={0.05}
-                  defaultEmptyValue={0}
-                />
-                <NumberInput
-                  key={`blks-${selectedTemplate}`}
-                  label="Block"
-                  value={formData.scoring.blks}
-                  onChange={(value) => handleScoringChange('blks', value)}
-                  min={-100}
-                  max={100}
-                  step={0.05}
-                  defaultEmptyValue={0}
-                />
-                <NumberInput
-                  key={`tos-${selectedTemplate}`}
-                  label="Turnover"
-                  value={formData.scoring.tos}
-                  onChange={(value) => handleScoringChange('tos', value)}
-                  min={-100}
-                  max={100}
-                  step={0.05}
-                  defaultEmptyValue={0}
-                />
-                <NumberInput
-                  key={`fgm-${selectedTemplate}`}
-                  label="FG Make"
-                  value={formData.scoring.fgm}
-                  onChange={(value) => handleScoringChange('fgm', value)}
-                  min={-100}
-                  max={100}
-                  step={0.05}
-                  defaultEmptyValue={0}
-                />
-                <NumberInput
-                  key={`fga-${selectedTemplate}`}
-                  label="FG Attempt"
-                  value={formData.scoring.fga}
-                  onChange={(value) => handleScoringChange('fga', value)}
-                  min={-100}
-                  max={100}
-                  step={0.05}
-                  defaultEmptyValue={0}
-                />
-                <NumberInput
-                  key={`tpm-${selectedTemplate}`}
-                  label="3P Make"
-                  value={formData.scoring.tpm}
-                  onChange={(value) => handleScoringChange('tpm', value)}
-                  min={-100}
-                  max={100}
-                  step={0.05}
-                  defaultEmptyValue={0}
-                />
-                <NumberInput
-                  key={`tpa-${selectedTemplate}`}
-                  label="3P Attempt"
-                  value={formData.scoring.tpa}
-                  onChange={(value) => handleScoringChange('tpa', value)}
-                  min={-100}
-                  max={100}
-                  step={0.05}
-                  defaultEmptyValue={0}
-                />
-                <NumberInput
-                  key={`ftm-${selectedTemplate}`}
-                  label="FT Make"
-                  value={formData.scoring.ftm}
-                  onChange={(value) => handleScoringChange('ftm', value)}
-                  min={-100}
-                  max={100}
-                  step={0.05}
-                  defaultEmptyValue={0}
-                />
-                <NumberInput
-                  key={`fta-${selectedTemplate}`}
-                  label="FT Attempt"
-                  value={formData.scoring.fta}
-                  onChange={(value) => handleScoringChange('fta', value)}
-                  min={-100}
-                  max={100}
-                  step={0.05}
-                  defaultEmptyValue={0}
-                />
-                <NumberInput
-                  key={`dbl-${selectedTemplate}`}
-                  label="Dbl Dbl"
-                  value={formData.scoring.dbl}
-                  onChange={(value) => handleScoringChange('dbl', value)}
-                  min={-100}
-                  max={100}
-                  step={0.05}
-                  defaultEmptyValue={0}
-                />
-                <NumberInput
-                  key={`tpl-${selectedTemplate}`}
-                  label="Trp Dbl"
-                  value={formData.scoring.tpl}
-                  onChange={(value) => handleScoringChange('tpl', value)}
-                  min={-100}
-                  max={100}
-                  step={0.05}
-                  defaultEmptyValue={0}
-                />
-                <NumberInput
-                  key={`qpl-${selectedTemplate}`}
-                  label="Quad Dbl"
-                  value={formData.scoring.qpl}
-                  onChange={(value) => handleScoringChange('qpl', value)}
-                  min={-100}
-                  max={100}
-                  step={0.05}
-                  defaultEmptyValue={0}
-                />
-                <NumberInput
-                  key={`fls-${selectedTemplate}`}
-                  label="Foul"
-                  value={formData.scoring.fls}
-                  onChange={(value) => handleScoringChange('fls', value)}
-                  min={-100}
-                  max={100}
-                  step={0.05}
-                  defaultEmptyValue={0}
-                />
-                <NumberInput
-                  key={`pt10-${selectedTemplate}`}
-                  label="10+ PTS"
-                  value={formData.scoring.pt10}
-                  onChange={(value) => handleScoringChange('pt10', value)}
-                  min={-100}
-                  max={100}
-                  step={0.05}
-                  defaultEmptyValue={0}
-                />
-                <NumberInput
-                  key={`rb10-${selectedTemplate}`}
-                  label="10+ REB"
-                  value={formData.scoring.rb10}
-                  onChange={(value) => handleScoringChange('rb10', value)}
-                  min={-100}
-                  max={100}
-                  step={0.05}
-                  defaultEmptyValue={0}
-                />
-                <NumberInput
-                  key={`ast10-${selectedTemplate}`}
-                  label="10+ AST"
-                  value={formData.scoring.ast10}
-                  onChange={(value) => handleScoringChange('ast10', value)}
-                  min={-100}
-                  max={100}
-                  step={0.05}
-                  defaultEmptyValue={0}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Roster Settings Section */}
-          <div>
-            <div className="px-8 py-5 border-y border-gray-200 dark:border-gray-700">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    {t('league.create.form.sections.roster.title')}
-                  </h2>
-                  {(formData.roster.pg + formData.roster.sg + formData.roster.sf + 
-                    formData.roster.pf + formData.roster.c + formData.roster.g + 
-                    formData.roster.f + formData.roster.gf + formData.roster.fc + 
-                    formData.roster.util) === 0 ? (
-                    <div className="flex items-center gap-1.5 text-error-500 dark:text-error-400">
-                      <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
-                      </svg>
-                      <span className="text-sm font-medium">Must Have At Least 1 Active Roster Spot</span>
-                    </div>
-                  ) : (formData.roster.pg + formData.roster.sg + formData.roster.sf + 
-                    formData.roster.pf + formData.roster.c + formData.roster.g + 
-                    formData.roster.f + formData.roster.gf + formData.roster.fc + 
-                    formData.roster.util + formData.roster.bench) !== 15 && (
-                    <div className="flex items-center gap-1.5 text-warning-500 dark:text-warning-600">
-                      <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-                      </svg>
-                      <span className="text-sm font-medium">15 Roster Spots Highly Recommended</span>
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-center gap-6 text-sm">
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-500 dark:text-gray-400">Active:</span>
-                    <span className="font-medium text-gray-900 dark:text-white">
-                      {formData.roster.pg + formData.roster.sg + formData.roster.sf + 
-                       formData.roster.pf + formData.roster.c + formData.roster.g + 
-                       formData.roster.f + formData.roster.gf + formData.roster.fc + 
-                       formData.roster.util}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-500 dark:text-gray-400">Inactive:</span>
-                    <span className="font-medium text-gray-900 dark:text-white">
-                      {formData.roster.bench}
-                    </span>
-                  </div>
-                  {hasRosterChanges && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleResetRoster}
-                    >
-                      Reset
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="p-8">
-              <div className="grid gap-6 grid-cols-[repeat(auto-fit,minmax(90px,1fr))]">
-                <NumberInput
-                  label="PG"
-                  value={formData.roster.pg}
-                  onChange={(value) => handleRosterChange('pg', value)}
-                  min={0}
-                  max={99}
-                  step={1}
-                  defaultEmptyValue={0}
-                  minWidth="90px"
-                />
-                <NumberInput
-                  label="SG"
-                  value={formData.roster.sg}
-                  onChange={(value) => handleRosterChange('sg', value)}
-                  min={0}
-                  max={99}
-                  step={1}
-                  defaultEmptyValue={0}
-                  minWidth="90px"
-                />
-                <NumberInput
-                  label="SF"
-                  value={formData.roster.sf}
-                  onChange={(value) => handleRosterChange('sf', value)}
-                  min={0}
-                  max={99}
-                  step={1}
-                  defaultEmptyValue={0}
-                  minWidth="90px"
-                />
-                <NumberInput
-                  label="PF"
-                  value={formData.roster.pf}
-                  onChange={(value) => handleRosterChange('pf', value)}
-                  min={0}
-                  max={99}
-                  step={1}
-                  defaultEmptyValue={0}
-                  minWidth="90px"
-                />
-                <NumberInput
-                  label="C"
-                  value={formData.roster.c}
-                  onChange={(value) => handleRosterChange('c', value)}
-                  min={0}
-                  max={99}
-                  step={1}
-                  defaultEmptyValue={0}
-                  minWidth="90px"
-                />
-                <NumberInput
-                  label="G"
-                  value={formData.roster.g}
-                  onChange={(value) => handleRosterChange('g', value)}
-                  min={0}
-                  max={99}
-                  step={1}
-                  defaultEmptyValue={0}
-                  minWidth="90px"
-                />
-                <NumberInput
-                  label="F"
-                  value={formData.roster.f}
-                  onChange={(value) => handleRosterChange('f', value)}
-                  min={0}
-                  max={99}
-                  step={1}
-                  defaultEmptyValue={0}
-                  minWidth="90px"
-                />
-                <NumberInput
-                  label="G/F"
-                  value={formData.roster.gf}
-                  onChange={(value) => handleRosterChange('gf', value)}
-                  min={0}
-                  max={99}
-                  step={1}
-                  defaultEmptyValue={0}
-                  minWidth="90px"
-                />
-                <NumberInput
-                  label="F/C"
-                  value={formData.roster.fc}
-                  onChange={(value) => handleRosterChange('fc', value)}
-                  min={0}
-                  max={99}
-                  step={1}
-                  defaultEmptyValue={0}
-                  minWidth="90px"
-                />
-                <NumberInput
-                  label="UTIL"
-                  value={formData.roster.util}
-                  onChange={(value) => handleRosterChange('util', value)}
-                  min={0}
-                  max={99}
-                  step={1}
-                  defaultEmptyValue={0}
-                  minWidth="90px"
-                />
-                <NumberInput
-                  label="Bench"
-                  value={formData.roster.bench}
-                  onChange={(value) => handleRosterChange('bench', value)}
-                  min={0}
-                  max={99}
-                  step={1}
-                  defaultEmptyValue={0}
-                  minWidth="90px"
-                />
-                <NumberInput
-                  label="IR"
-                  value={formData.roster.ir}
-                  onChange={(value) => handleRosterChange('ir', value)}
-                  min={0}
-                  max={99}
-                  step={1}
-                  defaultEmptyValue={0}
-                  minWidth="90px"
-                />
-              </div>
-        </div>
-      </div>
-
-          {/* Dynasty League Section */}
-          <div>
-            <div className="px-8 py-5 border-y border-gray-200 dark:border-gray-700">
-              <div className="flex items-center gap-3">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Dynasty League
-                </h2>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Public</span>
                 <Toggle
-                  checked={formData.dynasty?.enabled ?? false}
-                  onChange={(checked) => handleDynastyChange('enabled', checked)}
+                  checked={formData.public}
+                  onChange={(checked) => handleChange('public', checked)}
                   size="sm"
                 />
               </div>
             </div>
-            {formData.dynasty?.enabled && (
-              <div className="p-8">
-                <div className="flex flex-wrap items-center gap-8">
-                  <div className="w-[140px]">
-                    <NumberInput
-                      label="Keepers"
-                      value={formData.dynasty?.keepers ?? 6}
-                      onChange={(value) => handleDynastyChange('keepers', value)}
-                      min={0}
-                      max={formData.roster.pg + formData.roster.sg + formData.roster.sf + 
-                           formData.roster.pf + formData.roster.c + formData.roster.g + 
-                           formData.roster.f + formData.roster.gf + formData.roster.fc + 
-                           formData.roster.util + formData.roster.bench}
-                      step={1}
-                      defaultEmptyValue={0}
-                      minWidth="140px"
+          </div>
+        </div>
+
+        {/* League Settings Section */}
+        <div>
+          <div className="px-8 py-5 border-y border-gray-200 dark:border-gray-700">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {t('league.create.form.sections.settings.title')}
+            </h2>
+          </div>
+          <div className="p-8">
+            <div className="grid gap-8 md:grid-cols-2">
+              <Select
+                label={t('league.create.form.sections.settings.scoringType.label')}
+                value={formData.scoringType}
+                onChange={(value) => handleChange('scoringType', value)}
+                options={[
+                  { value: 'head-to-head', label: t('league.create.form.sections.settings.scoringType.options.headToHead') },
+                  { value: 'points', label: t('league.create.form.sections.settings.scoringType.options.points') },
+                  { value: 'roto', label: t('league.create.form.sections.settings.scoringType.options.roto') }
+                ]}
+              />
+              <NumberInput
+                label={t('league.create.form.sections.settings.teams.label')}
+                value={Number(formData.teams)}
+                onChange={(value) => handleChange('teams', value)}
+                min={2}
+                max={16}
+                step={1}
+                showClearButton={false}
+                defaultEmptyValue={10}
+              />
+              <Select
+                label={t('league.create.form.sections.settings.draftType.label')}
+                value={formData.draftType}
+                onChange={(value) => handleChange('draftType', value)}
+                options={[
+                  { value: 'snake', label: t('league.create.form.sections.settings.draftType.options.snake') },
+                  { value: 'auction', label: t('league.create.form.sections.settings.draftType.options.auction') },
+                  { value: 'linear', label: t('league.create.form.sections.settings.draftType.options.linear') }
+                ]}
+              />
+              <Input
+                type="datetime-local"
+                label={t('league.create.form.sections.settings.draftDate.label')}
+                value={formData.draftDate}
+                onChange={(e) => handleChange('draftDate', e.target.value)}
+              />
+            </div>
+          </div>
+      </div>
+
+        {/* Scoring Settings Section */}
+          <div>
+          <div className="px-8 py-5 border-y border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                {t('league.create.form.sections.scoring.title')}
+              </h2>
+              <div className="flex flex-row flex-wrap items-start gap-2 flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <div className="w-64 max-w-full mt-2 relative z-20">
+                    <Select
+                      label="Template"
+                      value={selectedTemplate}
+                      onChange={handleTemplateChange}
+                      options={templates.map(template => ({
+                        value: template.id,
+                        label: (
+                          <div className="flex items-center justify-between w-full">
+                            <span>{template.name}</span>
+                            {template.created_by && (
+                              <div
+                                role="button"
+                                tabIndex={0}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const selectedTemplate = templates.find(t => t.id === template.id);
+                                  if (!selectedTemplate) return;
+                                  setTemplateToDelete(selectedTemplate);
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    const selectedTemplate = templates.find(t => t.id === template.id);
+                                    if (!selectedTemplate) return;
+                                    setTemplateToDelete(selectedTemplate);
+                                  }
+                                }}
+                                className="p-1 text-gray-400 hover:text-error-500 dark:text-gray-500 dark:hover:text-error-500 transition-colors ml-auto cursor-pointer"
+                              >
+                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m4-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      }))}
                     />
                   </div>
-                  <div className="w-[240px]">
-                    <NumberInput
-                      label="Salary Increase"
-                      value={formData.dynasty?.salaryIncrease ?? 5}
-                      onChange={(value) => handleDynastyChange('salaryIncrease', value)}
-                      min={0}
-                      max={100}
-                      step={1}
-                      defaultEmptyValue={0}
-                      minWidth="240px"
-                    />
+                </div>
+                {hasNonZeroValues && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleClearAll}
+                    className="mt-2"
+                  >
+                    Clear All
+                  </Button>
+                )}
+                <div className="flex-1" />
+                <div className="flex items-center gap-2">
+                  <Input
+                    label="Custom Template"
+                    placeholder="Enter template name"
+                    value={hasReachedTemplateLimit ? "Custom template limit reached (5/5)" : newTemplateName}
+                    onChange={(e) => setNewTemplateName(e.target.value.slice(0, 24))}
+                    className="w-64 max-w-full mt-2"
+                    maxLength={24}
+                    disabled={hasReachedTemplateLimit}
+                  />
+                  <Button
+                    variant="affirmative"
+                    size="sm"
+                    onClick={handleSaveTemplate}
+                    disabled={isSavingTemplate || !newTemplateName.trim() || hasReachedTemplateLimit}
+                    isLoading={isSavingTemplate}
+                    className="mt-2"
+                  >
+                    Save
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="p-8">
+            <div className="grid gap-6 grid-cols-[repeat(auto-fit,minmax(180px,1fr))]">
+              <NumberInput
+                key={`pts-${selectedTemplate}`}
+                label="Point"
+                value={formData.scoring.pts}
+                onChange={(value) => handleScoringChange('pts', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`drbs-${selectedTemplate}`}
+                label="D Rebound"
+                value={formData.scoring.drbs}
+                onChange={(value) => handleScoringChange('drbs', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`orbs-${selectedTemplate}`}
+                label="O Rebound"
+                value={formData.scoring.orbs}
+                onChange={(value) => handleScoringChange('orbs', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`asts-${selectedTemplate}`}
+                label="Assist"
+                value={formData.scoring.asts}
+                onChange={(value) => handleScoringChange('asts', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`stls-${selectedTemplate}`}
+                label="Steal"
+                value={formData.scoring.stls}
+                onChange={(value) => handleScoringChange('stls', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`blks-${selectedTemplate}`}
+                label="Block"
+                value={formData.scoring.blks}
+                onChange={(value) => handleScoringChange('blks', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`tos-${selectedTemplate}`}
+                label="Turnover"
+                value={formData.scoring.tos}
+                onChange={(value) => handleScoringChange('tos', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`fgm-${selectedTemplate}`}
+                label="FG Make"
+                value={formData.scoring.fgm}
+                onChange={(value) => handleScoringChange('fgm', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`fga-${selectedTemplate}`}
+                label="FG Attempt"
+                value={formData.scoring.fga}
+                onChange={(value) => handleScoringChange('fga', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`tpm-${selectedTemplate}`}
+                label="3P Make"
+                value={formData.scoring.tpm}
+                onChange={(value) => handleScoringChange('tpm', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`tpa-${selectedTemplate}`}
+                label="3P Attempt"
+                value={formData.scoring.tpa}
+                onChange={(value) => handleScoringChange('tpa', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`ftm-${selectedTemplate}`}
+                label="FT Make"
+                value={formData.scoring.ftm}
+                onChange={(value) => handleScoringChange('ftm', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`fta-${selectedTemplate}`}
+                label="FT Attempt"
+                value={formData.scoring.fta}
+                onChange={(value) => handleScoringChange('fta', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`dbl-${selectedTemplate}`}
+                label="Dbl Dbl"
+                value={formData.scoring.dbl}
+                onChange={(value) => handleScoringChange('dbl', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`tpl-${selectedTemplate}`}
+                label="Trp Dbl"
+                value={formData.scoring.tpl}
+                onChange={(value) => handleScoringChange('tpl', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`qpl-${selectedTemplate}`}
+                label="Quad Dbl"
+                value={formData.scoring.qpl}
+                onChange={(value) => handleScoringChange('qpl', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`fls-${selectedTemplate}`}
+                label="Foul"
+                value={formData.scoring.fls}
+                onChange={(value) => handleScoringChange('fls', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`pt10-${selectedTemplate}`}
+                label="10+ PTS"
+                value={formData.scoring.pt10}
+                onChange={(value) => handleScoringChange('pt10', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`rb10-${selectedTemplate}`}
+                label="10+ REB"
+                value={formData.scoring.rb10}
+                onChange={(value) => handleScoringChange('rb10', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`ast10-${selectedTemplate}`}
+                label="10+ AST"
+                value={formData.scoring.ast10}
+                onChange={(value) => handleScoringChange('ast10', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Roster Settings Section */}
+        <div>
+          <div className="px-8 py-5 border-y border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {t('league.create.form.sections.roster.title')}
+                </h2>
+                {(formData.roster.pg + formData.roster.sg + formData.roster.sf + 
+                  formData.roster.pf + formData.roster.c + formData.roster.g + 
+                  formData.roster.f + formData.roster.gf + formData.roster.fc + 
+                  formData.roster.util) === 0 ? (
+                  <div className="flex items-center gap-1.5 text-error-500 dark:text-error-400">
+                    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-sm font-medium">Must Have At Least 1 Active Roster Spot</span>
                   </div>
-                  <div className="flex items-center gap-3 min-w-[200px]">
-                    <Toggle
-                      checked={formData.dynasty?.rookiesExempt ?? true}
-                      onChange={(checked) => handleDynastyChange('rookiesExempt', checked)}
-                      size="md"
-                    />
-                    <div>
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">
-                        Rookies Exempt From Salary Increase
-                      </span>
-                    </div>
+                ) : (formData.roster.pg + formData.roster.sg + formData.roster.sf + 
+                  formData.roster.pf + formData.roster.c + formData.roster.g + 
+                  formData.roster.f + formData.roster.gf + formData.roster.fc + 
+                  formData.roster.util + formData.roster.bench) !== 15 && (
+                  <div className="flex items-center gap-1.5 text-warning-500 dark:text-warning-600">
+                    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-sm font-medium">15 Roster Spots Highly Recommended</span>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-6 text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500 dark:text-gray-400">Active:</span>
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    {formData.roster.pg + formData.roster.sg + formData.roster.sf + 
+                     formData.roster.pf + formData.roster.c + formData.roster.g + 
+                     formData.roster.f + formData.roster.gf + formData.roster.fc + 
+                     formData.roster.util}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500 dark:text-gray-400">Inactive:</span>
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    {formData.roster.bench}
+                  </span>
+                </div>
+                {hasRosterChanges && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleResetRoster}
+                  >
+                    Reset
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="p-8">
+            <div className="grid gap-6 grid-cols-[repeat(auto-fit,minmax(90px,1fr))]">
+              <NumberInput
+                label="PG"
+                value={formData.roster.pg}
+                onChange={(value) => handleRosterChange('pg', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
+              <NumberInput
+                label="SG"
+                value={formData.roster.sg}
+                onChange={(value) => handleRosterChange('sg', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
+              <NumberInput
+                label="SF"
+                value={formData.roster.sf}
+                onChange={(value) => handleRosterChange('sf', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
+              <NumberInput
+                label="PF"
+                value={formData.roster.pf}
+                onChange={(value) => handleRosterChange('pf', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
+              <NumberInput
+                label="C"
+                value={formData.roster.c}
+                onChange={(value) => handleRosterChange('c', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
+              <NumberInput
+                label="G"
+                value={formData.roster.g}
+                onChange={(value) => handleRosterChange('g', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
+              <NumberInput
+                label="F"
+                value={formData.roster.f}
+                onChange={(value) => handleRosterChange('f', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
+              <NumberInput
+                label="G/F"
+                value={formData.roster.gf}
+                onChange={(value) => handleRosterChange('gf', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
+              <NumberInput
+                label="F/C"
+                value={formData.roster.fc}
+                onChange={(value) => handleRosterChange('fc', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
+              <NumberInput
+                label="UTIL"
+                value={formData.roster.util}
+                onChange={(value) => handleRosterChange('util', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
+              <NumberInput
+                label="Bench"
+                value={formData.roster.bench}
+                onChange={(value) => handleRosterChange('bench', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
+              <NumberInput
+                label="IR"
+                value={formData.roster.ir}
+                onChange={(value) => handleRosterChange('ir', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
+            </div>
+        </div>
+      </div>
+
+        {/* Dynasty League Section */}
+        <div className={cn(
+          formData.dynasty?.enabled && "border-b border-gray-200 dark:border-gray-700"
+        )}>
+          <div className="px-8 py-5 border-y border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Dynasty League
+              </h2>
+              <Toggle
+                checked={formData.dynasty?.enabled ?? false}
+                onChange={(checked) => handleDynastyChange('enabled', checked)}
+                size="sm"
+              />
+            </div>
+          </div>
+          {formData.dynasty?.enabled && (
+            <div className="p-8">
+              <div className="flex flex-wrap items-center gap-8">
+                <div className="w-[140px]">
+                  <NumberInput
+                    label="Keepers"
+                    value={formData.dynasty?.keepers ?? 6}
+                    onChange={(value) => handleDynastyChange('keepers', value)}
+                    min={0}
+                    max={formData.roster.pg + formData.roster.sg + formData.roster.sf + 
+                         formData.roster.pf + formData.roster.c + formData.roster.g + 
+                         formData.roster.f + formData.roster.gf + formData.roster.fc + 
+                         formData.roster.util + formData.roster.bench}
+                    step={1}
+                    defaultEmptyValue={0}
+                    minWidth="140px"
+                  />
+                </div>
+                <div className="w-[240px]">
+                  <NumberInput
+                    label="Salary Increase"
+                    value={formData.dynasty?.salaryIncrease ?? 5}
+                    onChange={(value) => handleDynastyChange('salaryIncrease', value)}
+                    min={0}
+                    max={100}
+                    step={1}
+                    defaultEmptyValue={0}
+                    minWidth="240px"
+                  />
+                </div>
+                <div className="flex items-center gap-3 min-w-[200px]">
+                  <Toggle
+                    checked={formData.dynasty?.rookiesExempt ?? true}
+                    onChange={(checked) => handleDynastyChange('rookiesExempt', checked)}
+                    size="md"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      Rookies Exempt From Salary Increase
+                    </span>
                   </div>
                 </div>
               </div>
-            )}
-          </div>
-
-          {/* Action Buttons */}
-          <div className="px-8 py-5 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-4">
-            <Button
-              variant="outline"
-            >
-              {t('common.actions.saveAsDraft')}
-            </Button>
-            <Button
-              variant="affirmative"
-            >
-              {t('common.actions.create')}
-            </Button>
+            </div>
+          )}
         </div>
+
+        {/* Action Buttons */}
+        <div className="px-8 py-8 border-gray-200 dark:border-gray-700 flex justify-end gap-4">
+          <Button
+            variant="outline"
+          >
+            {t('common.actions.saveAsDraft')}
+          </Button>
+          <Button
+            variant="affirmative"
+          >
+            {t('common.actions.create')}
+          </Button>
         </div>
       </div>
     </div>
