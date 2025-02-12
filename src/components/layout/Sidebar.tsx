@@ -13,6 +13,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase/client';
 import { useTranslations, MessageKeys } from '@/lib/i18n';
+import { cn } from '@/lib/utils';
 
 interface Profile {
   username: string | null;

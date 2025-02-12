@@ -82,7 +82,7 @@ const DEFAULT_TEMPLATES: ScoringTemplate[] = [
     fga: null,
     tpm: 1,
     tpa: null,
-    ftm: null,
+    ftm: 1,
     fta: null,
     dbl: null,
     tpl: null,
@@ -373,7 +373,18 @@ export default function LeaguePage() {
 
   const templatesMatch = (template1: Partial<ScoringTemplate>, template2: Partial<ScoringTemplate>): boolean => {
     const scoringFields = ['pts', 'drbs', 'orbs', 'asts', 'stls', 'blks', 'tos', 'fgm', 'fga', 'tpm', 'tpa', 'ftm', 'fta', 'dbl', 'tpl', 'qpl', 'fls', 'pt10', 'rb10', 'ast10'] as const;
-    return scoringFields.every(field => template1[field] === template2[field]);
+    return scoringFields.every(field => {
+      const val1 = template1[field] ?? 0;
+      const val2 = template2[field] ?? 0;
+      return Math.abs(Number(val1) - Number(val2)) < 0.001;
+    });
+  };
+
+  const hasTemplateChanges = () => {
+    const selectedTemplateData = templates.find(t => t.id === selectedTemplate);
+    if (!selectedTemplateData) return false;
+
+    return !templatesMatch(formData.scoring, selectedTemplateData);
   };
 
   const handleDeleteTemplate = async (template: ScoringTemplate) => {
@@ -614,81 +625,94 @@ export default function LeaguePage() {
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                 {t('league.create.form.sections.scoring.title')}
               </h2>
-              <div className="flex flex-row flex-wrap items-start gap-2 flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <div className="w-64 max-w-full mt-2 relative z-20">
-                    <Select
-                      label="Template"
-                      value={selectedTemplate}
-                      onChange={handleTemplateChange}
-                      options={templates.map(template => ({
-                        value: template.id,
-                        label: (
-                          <div className="flex items-center justify-between w-full">
-                            <span>{template.name}</span>
-                            {template.created_by && (
-                              <div
-                                role="button"
-                                tabIndex={0}
-                                onClick={(e) => {
+              <div className="flex flex-row items-center gap-3 flex-1 min-w-0">
+                <div className="w-64 max-w-full relative z-20">
+                  <Select
+                    label="Template"
+                    value={selectedTemplate}
+                    onChange={handleTemplateChange}
+                    options={templates.map(template => ({
+                      value: template.id,
+                      label: (
+                        <div className="flex items-center justify-between w-full">
+                          <span>
+                            {template.name}
+                            {selectedTemplate === template.id && hasTemplateChanges() && (
+                              <span className="text-warning-500 dark:text-warning-400 ml-1">*</span>
+                            )}
+                          </span>
+                          {template.created_by && (
+                            <div
+                              role="button"
+                              tabIndex={0}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const selectedTemplate = templates.find(t => t.id === template.id);
+                                if (!selectedTemplate) return;
+                                setTemplateToDelete(selectedTemplate);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
                                   e.stopPropagation();
                                   const selectedTemplate = templates.find(t => t.id === template.id);
                                   if (!selectedTemplate) return;
                                   setTemplateToDelete(selectedTemplate);
-                                }}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter' || e.key === ' ') {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    const selectedTemplate = templates.find(t => t.id === template.id);
-                                    if (!selectedTemplate) return;
-                                    setTemplateToDelete(selectedTemplate);
-                                  }
-                                }}
-                                className="p-1 text-gray-400 hover:text-error-500 dark:text-gray-500 dark:hover:text-error-500 transition-colors ml-auto cursor-pointer"
-                              >
-                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m4-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                              </div>
-                            )}
-                          </div>
-                        )
-                      }))}
-                    />
-                  </div>
-                </div>
-                {hasNonZeroValues && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleClearAll}
-                    className="mt-2"
-                  >
-                    Clear All
-                  </Button>
-                )}
-                <div className="flex-1" />
-                <div className="flex items-center gap-2">
-                  <Input
-                    label="Custom Template"
-                    placeholder="Enter template name"
-                    value={hasReachedTemplateLimit ? "Custom template limit reached (5/5)" : newTemplateName}
-                    onChange={(e) => setNewTemplateName(e.target.value.slice(0, 24))}
-                    className="w-64 max-w-full mt-2"
-                    maxLength={24}
-                    disabled={hasReachedTemplateLimit}
+                                }
+                              }}
+                              className="p-1 text-gray-400 hover:text-error-500 dark:text-gray-500 dark:hover:text-error-500 transition-colors ml-auto cursor-pointer"
+                            >
+                              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m4-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    }))}
                   />
-                  <Button
-                    variant="affirmative"
-                    size="sm"
-                    onClick={handleSaveTemplate}
-                    disabled={isSavingTemplate || !newTemplateName.trim() || hasReachedTemplateLimit}
-                    isLoading={isSavingTemplate}
-                    className="mt-2"
-                  >
-                    Save
-                  </Button>
+                </div>
+                {!hasNonZeroValues && (
+                  <div className="flex items-center gap-1.5 text-error-500 dark:text-error-400">
+                    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-sm font-medium">At Least 1 Category Required</span>
+                  </div>
+                )}
+                <div className="flex items-center gap-2 ml-auto">
+                  {hasNonZeroValues && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleClearAll}
+                      className="mt-2"
+                    >
+                      Clear All
+                    </Button>
+                  )}
+                  <div className="flex-1" />
+                  <div className="flex items-center gap-2">
+                    <Input
+                      label="Custom Template"
+                      placeholder="Enter template name"
+                      value={hasReachedTemplateLimit ? "Custom template limit reached (5/5)" : newTemplateName}
+                      onChange={(e) => setNewTemplateName(e.target.value.slice(0, 24))}
+                      className="w-64 max-w-full mt-2"
+                      maxLength={24}
+                      disabled={hasReachedTemplateLimit}
+                    />
+                    <Button
+                      variant="affirmative"
+                      size="sm"
+                      onClick={handleSaveTemplate}
+                      disabled={isSavingTemplate || !newTemplateName.trim() || hasReachedTemplateLimit}
+                      isLoading={isSavingTemplate}
+                      className="mt-2"
+                    >
+                      Save
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>

@@ -9,7 +9,7 @@ export default function AppLayout({
 }) {
   return (
     <div className="flex h-screen overflow-hidden">
-      <aside className="w-64 hidden md:block">
+      <aside className="w-56 hidden md:block">
         <Sidebar />
       </aside>
       <main className="flex-1 overflow-y-auto bg-gradient-to-br from-white via-gray-100 to-gray-200 dark:from-gray-950 dark:to-gray-800">

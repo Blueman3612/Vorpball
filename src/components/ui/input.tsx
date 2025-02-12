@@ -1,11 +1,13 @@
 import { InputHTMLAttributes, useState, useRef } from 'react';
 import { cn } from '@/lib/utils';
-import { PencilIcon } from '@heroicons/react/24/outline';
+import { PencilIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
   helperText?: string;
+  showClearButton?: boolean;
+  onClear?: () => void;
 }
 
 export function Input({
@@ -19,6 +21,9 @@ export function Input({
   value,
   defaultValue,
   placeholder,
+  showClearButton = true,
+  onClear,
+  onChange,
   ...props
 }: InputProps) {
   const [isFocused, setIsFocused] = useState(false);
@@ -33,9 +38,38 @@ export function Input({
     }
   };
 
+  const handleClear = () => {
+    if (onClear) {
+      onClear();
+    } else if (onChange) {
+      const event = {
+        target: {
+          value: ''
+        }
+      } as React.ChangeEvent<HTMLInputElement>;
+      onChange(event);
+    }
+  };
+
   return (
     <div className="w-full">
       <div className="relative">
+        {/* Clear button */}
+        {showClearButton && hasValue && (
+          <button
+            type="button"
+            onClick={handleClear}
+            className={cn(
+              'absolute right-2 -top-5 p-0.5 rounded-full z-10',
+              'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300',
+              'transition-colors duration-200',
+              'focus:outline-none focus:ring-2 focus:ring-primary-400/20'
+            )}
+          >
+            <XMarkIcon className="h-3.5 w-3.5" />
+          </button>
+        )}
+
         {label && (
           <label
             className={cn(
@@ -59,6 +93,7 @@ export function Input({
           value={value}
           defaultValue={defaultValue}
           placeholder={showFloatingLabel ? placeholder : ''}
+          onChange={onChange}
           className={cn(
             'block w-full transition-all duration-200',
             'px-3 h-10',
