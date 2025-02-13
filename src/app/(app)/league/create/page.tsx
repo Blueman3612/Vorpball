@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { NumberInput } from "@/components/ui/number-input";
-import { useTranslations } from "@/lib/i18n";
+import { useTranslations, type MessageKeys } from "@/lib/i18n";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { addToast, ToastContainer } from "@/components/ui/toast";
@@ -176,9 +176,20 @@ interface FormData {
   };
 }
 
-export default function LeaguePage() {
+// Define valid translation prefixes as a type
+type ValidPrefix = 
+  | 'league.create.form.sections.scoring.stats'
+  | 'league.create.form.sections.roster.positions';
+
+export default function CreateLeaguePage() {
   const { t } = useTranslations();
   const router = useRouter();
+
+  // Translation helper for dynamic keys with type safety
+  const getTranslationKey = (prefix: ValidPrefix, key: string) => {
+    return `${prefix}.${key}` as MessageKeys;
+  };
+
   const [formData, setFormData] = useState<FormData>(() => {
     const vorpballTemplate = DEFAULT_TEMPLATES.find(t => t.id === 'vorpball')!;
     const initialData: FormData = {
@@ -231,30 +242,45 @@ export default function LeaguePage() {
     ([key, value]) => value !== DEFAULT_ROSTER[key as keyof typeof DEFAULT_ROSTER]
   );
 
-  const handleChange = (field: string, value: string | number | boolean) => {
-    if (field === 'teams' && (value === '' || value === 0)) {
-      setFormData(prev => ({ ...prev, [field]: 10 }));
+  const handleChange = (field: string, value: string | number | boolean | undefined) => {
+    // Handle undefined values
+    if (value === undefined) {
       return;
     }
+
+    // Ensure value is a number for numeric fields
+    if (field === 'teams') {
+      const numValue = Number(value) || 10; // Default to 10 if invalid
+      setFormData(prev => ({ ...prev, [field]: numValue }));
+      return;
+    }
+
+    // Handle all other value types
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleScoringChange = (stat: keyof typeof formData.scoring, value: number) => {
+    const numValue = value === undefined ? 0 : Number(value);
+    if (isNaN(numValue)) return;
+
     setFormData(prev => ({
       ...prev,
       scoring: {
         ...prev.scoring,
-        [stat]: value
+        [stat]: numValue
       }
     }));
   };
 
-  const handleRosterChange = (position: keyof typeof formData.roster, value: number) => {
+  const handleRosterChange = (position: keyof typeof formData.roster, value: string | number) => {
+    const numValue = value === '' ? 0 : Number(value);
+    if (isNaN(numValue)) return;
+    
     setFormData(prev => ({
       ...prev,
       roster: {
         ...prev.roster,
-        [position]: value
+        [position]: numValue
       }
     }));
   };
@@ -292,20 +318,13 @@ export default function LeaguePage() {
   }, []);
 
   const handleTemplateChange = (value: string | number) => {
-    const template = templates.find(t => t.id === value);
+    const templateId = String(value);
+    const template = templates.find(t => t.id === templateId);
     if (!template) return;
 
-    setSelectedTemplate(template.id);
+    setSelectedTemplate(templateId);
     setFormData(prev => ({
       ...prev,
-      name: prev.name,
-      public: prev.public,
-      scoringType: prev.scoringType,
-      teams: prev.teams,
-      draftType: prev.draftType,
-      draftDate: prev.draftDate,
-      roster: prev.roster,
-      dynasty: prev.dynasty,
       scoring: {
         pts: Number(template.pts ?? 0),
         drbs: Number(template.drbs ?? 0),
@@ -621,6 +640,18 @@ export default function LeaguePage() {
     }
   };
 
+  // Add effect to check for warnings
+  useEffect(() => {
+    // Add your warning checks here
+    const warnings = [
+      !formData.name.trim(), // Name is required
+      formData.teams < 2,    // Need at least 2 teams
+      // Add other warning conditions as needed
+    ];
+    
+    setHasWarnings(warnings.some(Boolean));
+  }, [formData]); // Update warnings when form data changes
+
   return (
     <div className="p-8">
       <ToastContainer />
@@ -629,7 +660,7 @@ export default function LeaguePage() {
         onClose={() => setTemplateToDelete(null)}
         onConfirm={() => templateToDelete && handleDeleteTemplate(templateToDelete)}
         title={t('league.create.templates.delete.title')}
-        description={t('league.create.templates.delete.description', { name: templateToDelete?.name })}
+        description={t('league.create.templates.delete.description', { name: templateToDelete?.name || 'Unknown Template' })}
         confirmText={t('common.actions.delete')}
         cancelText={t('common.actions.cancel')}
         isDestructive={true}
@@ -678,7 +709,7 @@ export default function LeaguePage() {
             <div className="grid gap-8 md:grid-cols-2">
               <Select
                 label={t('league.create.form.sections.settings.scoringType.label')}
-                value={formData.scoringType}
+                value={formData.scoringType || 'category'}
                 onChange={(value) => handleChange('scoringType', value)}
                 options={[
                   { value: 'category', label: t('league.create.form.sections.settings.scoringType.options.category') },
@@ -688,7 +719,7 @@ export default function LeaguePage() {
               />
               <NumberInput
                 label={t('league.create.form.sections.settings.teams.label')}
-                value={Number(formData.teams)}
+                value={formData.teams}
                 onChange={(value) => handleChange('teams', value)}
                 min={2}
                 max={16}
@@ -823,7 +854,7 @@ export default function LeaguePage() {
               {Object.entries(formData.scoring).map(([key, value]) => (
                 <NumberInput
                   key={`${key}-${selectedTemplate}`}
-                  label={t(`league.create.form.sections.scoring.stats.${key}`)}
+                  label={t(getTranslationKey('league.create.form.sections.scoring.stats', key))}
                   value={value}
                   onChange={(value) => handleScoringChange(key as keyof typeof formData.scoring, value)}
                   min={-100}
@@ -899,7 +930,7 @@ export default function LeaguePage() {
               {Object.entries(formData.roster).map(([key, value]) => (
                 <NumberInput
                   key={key}
-                  label={t(`league.create.form.sections.roster.positions.${key}`)}
+                  label={t(getTranslationKey('league.create.form.sections.roster.positions', key))}
                   value={value}
                   onChange={(value) => handleRosterChange(key as keyof typeof formData.roster, value)}
                   min={0}
