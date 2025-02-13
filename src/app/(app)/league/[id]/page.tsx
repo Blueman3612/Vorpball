@@ -8,6 +8,8 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
+import { ChatInterface } from '@/components/chat/ChatInterface';
+import { addToast } from '@/components/ui/toast';
 
 // Dashboard Tab Component
 function DashboardTab() {
@@ -181,182 +183,10 @@ function TradesTab() {
 // Talk Tab Component
 function TalkTab() {
   const { id: leagueId } = useParams();
-  const [channels, setChannels] = useState<any[]>([]);
-  const [currentChannel, setCurrentChannel] = useState<string | null>(null);
-  const [messages, setMessages] = useState<any[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Fetch channels on mount
-  useEffect(() => {
-    async function fetchChannels() {
-      try {
-        setIsLoading(true);
-        
-        // Get current user
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        if (userError) throw userError;
-        if (!user) {
-          setError('You must be logged in to view channels.');
-          return;
-        }
-
-        // First check if user is a member of the league
-        const { data: memberData, error: memberError } = await supabase
-          .from('league_members')
-          .select('id')
-          .match({ league_id: leagueId, user_id: user.id })
-          .maybeSingle();
-
-        if (memberError) {
-          console.error('Error checking membership:', memberError);
-          setError('Failed to verify league membership.');
-          return;
-        }
-
-        if (!memberData) {
-          setError('You are not a member of this league.');
-          return;
-        }
-
-        // Then fetch channels
-        const { data: channelsData, error: channelsError } = await supabase
-          .from('league_channels')
-          .select('*')
-          .eq('league_id', leagueId)
-          .order('position');
-
-        if (channelsError) {
-          console.error('Error fetching channels:', channelsError);
-          setError('Failed to load channels. Please try again later.');
-          return;
-        }
-
-        setError(null);
-        setChannels(channelsData || []);
-        if (channelsData && channelsData.length > 0 && !currentChannel) {
-          setCurrentChannel(channelsData[0].id);
-        }
-      } catch (err) {
-        console.error('Error in fetchChannels:', err);
-        setError('An unexpected error occurred. Please try again later.');
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    fetchChannels();
-  }, [leagueId, currentChannel]);
-
-  if (isLoading) {
-    return (
-      <div className="flex h-[calc(100vh-12rem)] items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
-        <div className="text-center">
-          <div className="w-12 h-12 border-3 border-gray-300 border-t-primary-600 rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">Loading channels...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex h-[calc(100vh-12rem)] items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
-        <div className="text-center">
-          <div className="text-error-500 mb-2">
-            <svg className="h-8 w-8 mx-auto" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
-          </div>
-          <p className="text-gray-600 dark:text-gray-400">{error}</p>
-          <Button
-            variant="outline"
-            size="sm"
-            className="mt-4"
-            onClick={() => window.location.reload()}
-          >
-            Try Again
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
+  
   return (
-    <div className="flex h-[calc(100vh-12rem)] overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
-      {/* Channels Sidebar */}
-      <div className="w-64 flex-shrink-0 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase">Channels</h3>
-        </div>
-        <div className="overflow-y-auto h-full">
-          {channels.map((channel) => (
-            <button
-              key={channel.id}
-              onClick={() => setCurrentChannel(channel.id)}
-              className={cn(
-                'w-full px-4 py-2 text-left text-sm transition-colors',
-                'flex items-center gap-2',
-                channel.id === currentChannel
-                  ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white'
-                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50'
-              )}
-            >
-              {channel.type === 'announcement' ? (
-                <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M18 3a1 1 0 00-1.447-.894L8.763 6H5a3 3 0 000 6h.28l1.771 5.316A1 1 0 008 18h1a1 1 0 001-1v-4.382l6.553 3.276A1 1 0 0018 15V3z" clipRule="evenodd" />
-                </svg>
-              ) : (
-                <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M18 5v8a2 2 0 01-2 2h-5l-5 4v-4H4a2 2 0 01-2-2V5a2 2 0 012-2h12a2 2 0 012 2zM7 8H5v2h2V8zm2 0h2v2H9V8zm6 0h-2v2h2V8z" clipRule="evenodd" />
-                </svg>
-              )}
-              # {channel.name}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Messages Area */}
-      <div className="flex-1 flex flex-col bg-white dark:bg-gray-900">
-        {/* Channel Header */}
-        {currentChannel && (
-          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-            <div className="flex items-center gap-2">
-              <h3 className="text-lg font-semibold">
-                # {channels.find(c => c.id === currentChannel)?.name}
-              </h3>
-              <span className="text-sm text-gray-500 dark:text-gray-400">
-                {channels.find(c => c.id === currentChannel)?.description}
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* Messages List */}
-        <div className="flex-1 overflow-y-auto p-4">
-          {/* Message placeholder */}
-          <div className="text-sm text-gray-500 dark:text-gray-400">
-            No messages yet
-          </div>
-        </div>
-
-        {/* Message Input */}
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Send a message..."
-              className={cn(
-                'w-full px-4 py-2 bg-gray-100 dark:bg-gray-800',
-                'rounded-lg border border-transparent',
-                'focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20',
-                'text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400'
-              )}
-            />
-          </div>
-        </div>
-      </div>
+    <div className="h-[calc(100vh-12rem)]">
+      <ChatInterface leagueId={leagueId as string} />
     </div>
   );
 }
@@ -383,6 +213,84 @@ function SettingsTab() {
 
 export default function LeaguePage() {
   const { t } = useTranslations();
+  const { id: leagueId } = useParams();
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  
+  // Check if user has access to this league
+  useEffect(() => {
+    async function checkAccess() {
+      try {
+        setIsLoading(true);
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError) throw userError;
+        if (!user) {
+          setError('You must be logged in to view leagues.');
+          return;
+        }
+
+        // Try to fetch the league - RLS will prevent access if user is not a member
+        const { data: leagueData, error: leagueError } = await supabase
+          .from('leagues')
+          .select('id, name')
+          .eq('id', leagueId)
+          .single();
+
+        if (leagueError || !leagueData) {
+          setError('You do not have access to this league.');
+          return;
+        }
+
+        // Check if user is admin
+        const { data: memberData, error: memberError } = await supabase
+          .from('league_members')
+          .select('role')
+          .eq('league_id', leagueId)
+          .eq('user_id', user.id)
+          .single();
+
+        if (!memberError && memberData) {
+          setIsAdmin(memberData.role === 'admin');
+        }
+
+        setError(null);
+      } catch (err) {
+        console.error('Error checking league access:', err);
+        setError('An error occurred while checking league access.');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    checkAccess();
+  }, [leagueId]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
+        <div className="text-center">
+          <div className="w-12 h-12 border-3 border-gray-300 border-t-primary-600 rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-500 dark:text-gray-400">Loading league...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
+        <div className="text-center">
+          <div className="text-error-500 mb-2">
+            <svg className="h-8 w-8 mx-auto" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <p className="text-gray-500 dark:text-gray-400">{error}</p>
+        </div>
+      </div>
+    );
+  }
   
   const tabs: Tab[] = [
     {
@@ -419,6 +327,41 @@ export default function LeaguePage() {
 
   return (
     <div className="mx-auto px-8 py-6">
+      {isAdmin && (
+        <div className="mb-6 flex justify-end">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              try {
+                const { data, error } = await supabase
+                  .from('league_invites')
+                  .insert({
+                    league_id: leagueId
+                  })
+                  .select('code')
+                  .single();
+
+                if (error) throw error;
+
+                // Copy the invite code to clipboard
+                await navigator.clipboard.writeText(data.code);
+                addToast('Invite code copied to clipboard!', 'success');
+              } catch (error) {
+                console.error('Error generating invite:', error);
+                addToast('Failed to generate invite code', 'error');
+              }
+            }}
+            className="flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M11 6a3 3 0 11-6 0 3 3 0 016 0zM14 17a6 6 0 00-12 0h12zM13 8a1 1 0 100 2 1 1 0 000-2zM18 10a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            Invite Member
+          </Button>
+      </div>
+      )}
+
       <Tabs tabs={tabs} variant="default" />
     </div>
   );

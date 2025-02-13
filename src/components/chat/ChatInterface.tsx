@@ -3,6 +3,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase/client';
+import { CustomScrollArea } from '@/components/ui/custom-scroll-area';
+import { useRealtimeSubscription } from '@/lib/hooks/useRealtimeSubscription';
+import { User } from '@supabase/supabase-js';
+import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
 interface Channel {
   id: string;
@@ -10,6 +14,7 @@ interface Channel {
   description: string | null;
   type: 'text' | 'announcement';
   position: number;
+  permissions: 'everyone' | 'admin';
 }
 
 interface Message {
@@ -25,6 +30,13 @@ interface Message {
   };
 }
 
+interface TypingUser {
+  user_id: string;
+  username: string;
+  channel_id: string;
+  last_typed: string;
+}
+
 interface ChatInterfaceProps {
   leagueId: string;
   className?: string;
@@ -38,7 +50,13 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const [userRole, setUserRole] = useState<'member' | 'admin' | null>(null);
+  const [canPost, setCanPost] = useState<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const lastTypedRef = useRef<number>(0);
 
   // Scroll to bottom of messages
   const scrollToBottom = () => {
@@ -48,6 +66,47 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Add effect to fetch user role
+  useEffect(() => {
+    async function fetchUserRole() {
+      try {
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError) throw userError;
+        if (!user) return;
+
+        const { data, error } = await supabase
+          .from('league_members')
+          .select('role')
+          .eq('league_id', leagueId)
+          .eq('user_id', user.id)
+          .single();
+
+        if (error) throw error;
+        setUserRole(data.role);
+      } catch (err) {
+        console.error('Error fetching user role:', err);
+      }
+    }
+
+    fetchUserRole();
+  }, [leagueId]);
+
+  // Function to check if user can post in current channel
+  const canPostInChannel = (channel: Channel) => {
+    if (!channel || !userRole) return false;
+    return channel.permissions === 'everyone' || (channel.permissions === 'admin' && userRole === 'admin');
+  };
+
+  // Update canPost when channel or userRole changes
+  useEffect(() => {
+    if (currentChannel) {
+      const channel = channels.find(c => c.id === currentChannel);
+      if (channel) {
+        setCanPost(canPostInChannel(channel));
+      }
+    }
+  }, [currentChannel, channels, userRole]);
 
   // Fetch channels on mount
   useEffect(() => {
@@ -70,12 +129,19 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
           .eq('league_id', leagueId)
           .order('position');
 
-        if (channelsError) {
-          console.error('Error fetching channels:', channelsError);
-          setError('Failed to load channels. Please try again later.');
-          return;
-        }
+        if (channelsError) throw channelsError;
 
+        // Fetch user role
+        const { data: roleData, error: roleError } = await supabase
+          .from('league_members')
+          .select('role')
+          .eq('league_id', leagueId)
+          .eq('user_id', user.id)
+          .single();
+
+        if (roleError) throw roleError;
+
+        setUserRole(roleData?.role || null);
         setError(null);
         setChannels(channelsData || []);
         
@@ -98,11 +164,10 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
     fetchChannels();
   }, [leagueId]);
 
-  // Fetch messages and subscribe to new ones when channel changes
+  // Add effect to fetch initial messages when channel changes
   useEffect(() => {
     if (!currentChannel) return;
 
-    // Fetch existing messages
     async function fetchMessages() {
       try {
         // First fetch messages
@@ -144,62 +209,122 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
     }
 
     fetchMessages();
-
-    // Subscribe to new messages
-    const subscription = supabase
-      .channel(`channel:${currentChannel}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'channel_messages',
-          filter: `channel_id=eq.${currentChannel}`
-        },
-        async (payload) => {
-          // Fetch the complete message
-          const { data: messageData, error: messageError } = await supabase
-            .from('channel_messages')
-            .select('*')
-            .eq('id', payload.new.id)
-            .single();
-
-          if (messageError) {
-            console.error('Error fetching new message:', messageError);
-            return;
-          }
-
-          // Fetch the user profile
-          const { data: profileData, error: profileError } = await supabase
-            .from('profiles')
-            .select('id, username, avatar_url')
-            .eq('id', messageData.user_id)
-            .single();
-
-          if (profileError) {
-            console.error('Error fetching profile:', profileError);
-            return;
-          }
-
-          // Transform the data to match our Message interface
-          const typedMessage = {
-            id: messageData.id,
-            content: messageData.content,
-            created_at: messageData.created_at,
-            user_id: messageData.user_id,
-            channel_id: messageData.channel_id,
-            user: profileData
-          } as Message;
-
-          setMessages(prev => [...prev, typedMessage]);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      subscription.unsubscribe();
-    };
   }, [currentChannel]);
+
+  // Replace the message subscription effect with useRealtimeSubscription
+  useRealtimeSubscription<{
+    id: string;
+    content: string;
+    created_at: string;
+    user_id: string;
+    channel_id: string;
+  }>(
+    {
+      channel: `channel:${currentChannel}`,
+      table: 'channel_messages',
+      event: 'INSERT',
+      filter: `channel_id=eq.${currentChannel}`,
+      callback: async (payload) => {
+        const newMessage = payload.new;
+        if (!newMessage) return;
+        
+        // Fetch the user profile
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, username, avatar_url')
+          .eq('id', newMessage.user_id)
+          .single();
+
+        if (profileError) {
+          console.error('Error fetching profile:', profileError);
+          return;
+        }
+
+        // Transform the data to match our Message interface
+        const typedMessage = {
+          ...newMessage,
+          user: profileData
+        } as Message;
+
+        setMessages(prev => [...prev, typedMessage]);
+      }
+    },
+    [currentChannel]
+  );
+
+  // Replace the typing subscription effect with useRealtimeSubscription
+  useRealtimeSubscription<TypingUser>(
+    {
+      channel: `typing:${currentChannel}`,
+      event: 'sync',
+      callback: (payload) => {
+        if (!payload) return;
+        
+        // Convert presence state to array of typing users
+        const currentTyping = Object.values(payload).flat();
+        
+        // Filter out stale typing indicators
+        const now = Date.now();
+        setTypingUsers(
+          currentTyping.filter(typingUser => 
+            typingUser &&
+            typingUser.channel_id === currentChannel &&
+            now - new Date(typingUser.last_typed).getTime() < 3000
+          )
+        );
+      }
+    },
+    [currentChannel]
+  );
+
+  // Update the typing status function to use the subscription
+  const updateTypingStatus = async () => {
+    const now = Date.now();
+    if (now - lastTypedRef.current < 1000) return; // Throttle updates
+    lastTypedRef.current = now;
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || !currentChannel) return;
+
+    try {
+      const channel = supabase.channel(`typing:${currentChannel}`);
+      
+      // Get the user's profile for the correct username
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', user.id)
+        .single();
+
+      if (!profile?.username) return;
+
+      // Subscribe and track in sequence
+      await channel.subscribe();
+      await channel.track({
+        user_id: user.id,
+        username: profile.username,
+        channel_id: currentChannel,
+        last_typed: new Date().toISOString()
+      });
+
+      // Clear previous timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+
+      // Set timeout to clear typing status
+      typingTimeoutRef.current = setTimeout(async () => {
+        try {
+          await channel.untrack();
+          await channel.unsubscribe();
+        } catch (err) {
+          console.error('Error cleaning up typing status:', err);
+        }
+      }, 3000);
+    } catch (err) {
+      console.error('Error updating typing status:', err);
+    }
+  };
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -208,6 +333,9 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
 
     try {
       setIsSending(true);
+      const currentInput = inputRef.current;
+      const selectionStart = currentInput?.selectionStart;
+      const selectionEnd = currentInput?.selectionEnd;
       
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError) throw userError;
@@ -227,6 +355,12 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
       if (sendError) throw sendError;
 
       setMessageInput('');
+      // Ensure input maintains focus and restore cursor position
+      requestAnimationFrame(() => {
+        currentInput?.focus();
+        if (selectionStart) currentInput.selectionStart = 0;
+        if (selectionEnd) currentInput.selectionEnd = 0;
+      });
     } catch (err) {
       console.error('Error sending message:', err);
     } finally {
@@ -268,7 +402,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
           <div className="p-4 border-b border-gray-300/50 dark:border-gray-700/30">
             <h3 className="text-base font-medium text-gray-900 dark:text-gray-100">Channels</h3>
           </div>
-          <div className="overflow-y-auto">
+          <CustomScrollArea className="h-[calc(100%-4rem)]">
             {channels.map((channel) => (
               <button
                 key={channel.id}
@@ -293,7 +427,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
                 # {channel.name}
               </button>
             ))}
-          </div>
+          </CustomScrollArea>
         </div>
 
         {/* Messages Area */}
@@ -313,71 +447,120 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
           )}
 
           {/* Messages List */}
-          <div className="flex-1 overflow-y-auto p-4">
+          <CustomScrollArea className="flex-1 p-4">
             {messages.length === 0 ? (
               <div className="text-sm text-gray-600 dark:text-gray-400">
                 No messages yet
               </div>
             ) : (
-              <div className="space-y-4">
-                {messages.map((message) => (
-                  <div key={message.id} className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex-shrink-0 overflow-hidden">
-                      {message.user.avatar_url ? (
-                        <img
-                          src={message.user.avatar_url}
-                          alt={message.user.username}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
-                          {message.user.username.charAt(0).toUpperCase()}
+              <div className="space-y-2">
+                {messages.map((message, index) => {
+                  const previousMessage = index > 0 ? messages[index - 1] : null;
+                  const showHeader = 
+                    !previousMessage || 
+                    previousMessage.user_id !== message.user_id ||
+                    new Date(message.created_at).getTime() - new Date(previousMessage.created_at).getTime() > 60000;
+
+                  return (
+                    <div key={message.id} className="flex gap-3">
+                      {showHeader ? (
+                        <div className="flex-shrink-0 relative top-2">
+                          <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                            {message.user.avatar_url ? (
+                              <img
+                                src={message.user.avatar_url}
+                                alt={message.user.username}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
+                                {message.user.username.charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                          </div>
                         </div>
+                      ) : (
+                        <div className="w-8 flex-shrink-0" />
                       )}
-                    </div>
-                    <div>
-                      <div className="flex items-baseline gap-2">
-                        <span className="font-medium text-gray-900 dark:text-white">
-                          {message.user.username}
-                        </span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          {new Date(message.created_at).toLocaleTimeString()}
-                        </span>
+                      <div>
+                        {showHeader && (
+                          <div className="flex items-baseline gap-2">
+                            <span className="font-medium text-gray-900 dark:text-white">
+                              {message.user.username}
+                            </span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              {new Date(message.created_at).toLocaleTimeString()}
+                            </span>
+                          </div>
+                        )}
+                        <p className={cn(
+                          "text-gray-800 dark:text-gray-200",
+                          !showHeader && "pt-0"
+                        )}>{message.content}</p>
                       </div>
-                      <p className="text-gray-800 dark:text-gray-200">{message.content}</p>
                     </div>
+                  );
+                })}
+                {typingUsers.length > 0 && (
+                  <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                    <div className="flex gap-1">
+                      <span className="animate-bounce">•</span>
+                      <span className="animate-bounce [animation-delay:0.2s]">•</span>
+                      <span className="animate-bounce [animation-delay:0.4s]">•</span>
+                    </div>
+                    <span>
+                      {typingUsers.length === 1 
+                        ? `${typingUsers[0].username} is typing...`
+                        : typingUsers.length === 2
+                        ? `${typingUsers[0].username} and ${typingUsers[1].username} are typing...`
+                        : `${typingUsers.length} people are typing...`}
+                    </span>
                   </div>
-                ))}
+                )}
                 <div ref={messagesEndRef} />
               </div>
             )}
-          </div>
+          </CustomScrollArea>
 
           {/* Message Input */}
           <div className="p-4 border-t border-gray-300/50 dark:border-gray-700/30">
-            <form onSubmit={handleSendMessage}>
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Send a message..."
-                  value={messageInput}
-                  onChange={(e) => setMessageInput(e.target.value)}
-                  className={cn(
-                    'w-full px-4 py-2 rounded-md',
-                    'bg-gray-100/50 dark:bg-gray-800/50',
-                    'border border-gray-300/50 dark:border-gray-600/30',
-                    'hover:border-gray-400/50 dark:hover:border-gray-500/50',
-                    'text-gray-900 dark:text-white',
-                    'placeholder-gray-500 dark:placeholder-gray-400',
-                    'focus:outline-none focus:ring-2 focus:ring-primary-500/20',
-                    'focus:border-primary-500/50',
-                    'transition-colors duration-200',
-                    isSending && 'opacity-50 cursor-not-allowed'
-                  )}
-                  disabled={isSending}
-                />
-              </div>
-            </form>
+            {currentChannel && channels.find(c => c.id === currentChannel) && (
+              <>
+                {!canPost ? (
+                  <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-2">
+                    You don't have permission to post in this channel
+                  </div>
+                ) : (
+                  <form onSubmit={handleSendMessage}>
+                    <div className="relative">
+                      <input
+                        ref={inputRef}
+                        type="text"
+                        placeholder="Send a message..."
+                        value={messageInput}
+                        onChange={(e) => {
+                          setMessageInput(e.target.value);
+                          updateTypingStatus();
+                        }}
+                        className={cn(
+                          'w-full px-4 py-2 rounded-md',
+                          'bg-gray-100/50 dark:bg-gray-800/50',
+                          'border border-gray-300/50 dark:border-gray-600/30',
+                          'hover:border-gray-400/50 dark:hover:border-gray-500/50',
+                          'text-gray-900 dark:text-white',
+                          'placeholder-gray-500 dark:placeholder-gray-400',
+                          'focus:outline-none focus:ring-2 focus:ring-primary-500/20',
+                          'focus:border-primary-500/50',
+                          'transition-colors duration-200',
+                          isSending && 'opacity-50 cursor-not-allowed'
+                        )}
+                        disabled={isSending}
+                      />
+                    </div>
+                  </form>
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>

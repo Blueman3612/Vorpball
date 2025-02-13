@@ -13,11 +13,7 @@ interface League {
 }
 
 interface LeagueMemberResponse {
-  league: {
-    id: string;
-    name: string;
-    created_at: string;
-  };
+  league: League;
 }
 
 export default function TalkPage() {
@@ -51,7 +47,7 @@ export default function TalkPage() {
         if (leaguesError) throw leaguesError;
 
         // Transform the data to get the leagues array with proper typing
-        const leaguesData = data ? (data as LeagueMemberResponse[]).map(item => item.league) : [];
+        const leaguesData = ((data as unknown) as LeagueMemberResponse[])?.map(item => item.league) || [];
         setLeagues(leaguesData);
         
         // Select the first league by default if we have leagues and none is selected

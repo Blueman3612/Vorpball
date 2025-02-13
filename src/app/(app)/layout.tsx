@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { cn } from "@/lib/utils";
 import Sidebar from "@/components/layout/Sidebar";
+import { ToastContainer } from '@/components/ui/toast';
 
 export default function AppLayout({
   children,
@@ -58,6 +59,7 @@ export default function AppLayout({
           <div className="w-12 h-12 border-3 border-gray-300 border-t-blue-600 rounded-full animate-spin" />
         </div>
       )}
+      <ToastContainer />
     </div>
   );
 } 
