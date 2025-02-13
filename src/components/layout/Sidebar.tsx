@@ -8,7 +8,8 @@ import {
   UsersIcon, 
   ChartBarIcon, 
   TrophyIcon,
-  TableCellsIcon
+  TableCellsIcon,
+  ChatBubbleLeftRightIcon
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase/client';
@@ -32,6 +33,7 @@ const navigation: NavigationItem[] = [
   { name: 'common.navigation.myTeams', href: '/teams', icon: UsersIcon },
   { name: 'common.navigation.players', href: '/players', icon: TableCellsIcon },
   { name: 'common.navigation.statsAndAnalysis', href: '/stats', icon: ChartBarIcon },
+  { name: 'common.navigation.talk', href: '/talk', icon: ChatBubbleLeftRightIcon },
 ];
 
 export default function Sidebar() {

@@ -19,7 +19,8 @@
       "myTeams": "My Teams",
       "players": "Players",
       "statsAndAnalysis": "Stats & Analysis",
-      "viewProfile": "View profile"
+      "viewProfile": "View profile",
+      "talk": "Talk"
     },
     "states": {
       "loading": "Loading...",
@@ -66,7 +67,8 @@
       "matchup": "Matchup",
       "team": "Team",
       "trades": "Trades",
-      "settings": "Settings"
+      "settings": "Settings",
+      "talk": "Talk"
     }
   },
   "auth": {
