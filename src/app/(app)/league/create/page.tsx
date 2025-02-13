@@ -979,11 +979,6 @@ export default function LeaguePage() {
         {/* Action Buttons */}
         <div className="px-8 py-8 border-gray-200 dark:border-gray-700 flex justify-end gap-4">
           <Button
-            variant="outline"
-          >
-            {t('common.actions.saveAsDraft')}
-          </Button>
-          <Button
             variant="affirmative"
             onClick={handleCreateLeague}
             disabled={isSubmitting || hasWarnings || !formData.name.trim()}

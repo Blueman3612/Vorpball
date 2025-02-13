@@ -60,6 +60,13 @@
       "atLeastOneRequired": "At Least 1 Category Required",
       "recommendedRosterSize": "15 Roster Spots Highly Recommended",
       "atLeastOneActiveSpot": "Must Have At Least 1 Active Roster Spot"
+    },
+    "tabs": {
+      "dashboard": "Dashboard",
+      "matchup": "Matchup",
+      "team": "Team",
+      "trades": "Trades",
+      "settings": "Settings"
     }
   },
   "auth": {

@@ -1,97 +1,162 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase/client';
+import { Tabs, type Tab } from '@/components/ui/tabs';
+import { useTranslations } from '@/lib/i18n';
 import { Card } from '@/components/ui/card';
-import { useParams } from 'next/navigation';
 
-interface League {
-  id: string;
-  name: string;
-  scoring_type: 'category' | 'points' | 'both';
-  num_teams: number;
-  draft_type: 'snake' | 'auction' | 'linear';
-  draft_date: string | null;
-  status: 'active' | 'draft' | 'completed';
-}
-
-export default function LeagueDashboard() {
-  const params = useParams();
-  const [league, setLeague] = useState<League | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function fetchLeague() {
-      try {
-        const { data, error } = await supabase
-          .from('leagues')
-          .select('*')
-          .eq('id', params.id)
-          .single();
-
-        if (error) throw error;
-        setLeague(data);
-      } catch (error) {
-        console.error('Error fetching league:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    if (params.id) {
-      fetchLeague();
-    }
-  }, [params.id]);
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-[200px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
-      </div>
-    );
-  }
-
-  if (!league) {
-    return (
-      <div className="p-8">
-        <h1 className="text-2xl font-bold mb-4">League not found</h1>
-      </div>
-    );
-  }
-
+// Dashboard Tab Component
+function DashboardTab() {
   return (
-    <div className="p-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">{league.name}</h1>
-        <p className="text-gray-600 dark:text-gray-400">
-          {league.scoring_type.charAt(0).toUpperCase() + league.scoring_type.slice(1)} League • {league.num_teams} Teams
-        </p>
-      </div>
-
-      <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <Card className="p-6">
-          <h2 className="text-xl font-semibold mb-4">League Info</h2>
-          <div className="space-y-2">
-            <p><span className="font-medium">Format:</span> {league.scoring_type}</p>
-            <p><span className="font-medium">Teams:</span> {league.num_teams}</p>
-            <p><span className="font-medium">Draft Type:</span> {league.draft_type}</p>
-            {league.draft_date && (
-              <p><span className="font-medium">Draft Date:</span> {new Date(league.draft_date).toLocaleDateString()}</p>
-            )}
-            <p><span className="font-medium">Status:</span> {league.status || 'draft'}</p>
+          <h3 className="text-lg font-semibold mb-4">League Standings</h3>
+          <div className="h-48 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
+        </Card>
+        <Card className="p-6">
+          <h3 className="text-lg font-semibold mb-4">Recent Activity</h3>
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-8 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+            ))}
           </div>
         </Card>
-
         <Card className="p-6">
-          <h2 className="text-xl font-semibold mb-4">Standings</h2>
-          <p className="text-gray-600 dark:text-gray-400">Coming soon</p>
-        </Card>
-
-        <Card className="p-6">
-          <h2 className="text-xl font-semibold mb-4">Recent Activity</h2>
-          <p className="text-gray-600 dark:text-gray-400">Coming soon</p>
+          <h3 className="text-lg font-semibold mb-4">League Calendar</h3>
+          <div className="h-48 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
         </Card>
       </div>
+    </div>
+  );
+}
+
+// Matchup Tab Component
+function MatchupTab() {
+  return (
+    <Card className="p-6">
+      <div className="flex justify-between items-center mb-6">
+        <div className="w-1/3">
+          <div className="h-24 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
+          <div className="mt-4 h-6 w-2/3 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+        </div>
+        <div className="text-2xl font-bold">VS</div>
+        <div className="w-1/3">
+          <div className="h-24 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
+          <div className="mt-4 h-6 w-2/3 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+        </div>
+      </div>
+      <div className="h-64 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
+    </Card>
+  );
+}
+
+// Team Tab Component
+function TeamTab() {
+  return (
+    <div className="space-y-6">
+      <Card className="p-6">
+        <h3 className="text-lg font-semibold mb-4">My Roster</h3>
+        <div className="space-y-4">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="flex items-center space-x-4">
+              <div className="h-12 w-12 bg-gray-100 dark:bg-gray-800 rounded-full animate-pulse" />
+              <div className="flex-1">
+                <div className="h-4 w-1/4 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+                <div className="mt-2 h-3 w-1/3 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+              </div>
+              <div className="h-8 w-24 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// Trades Tab Component
+function TradesTab() {
+  return (
+    <div className="space-y-6">
+      <Card className="p-6">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-lg font-semibold">Trade Offers</h3>
+          <div className="h-10 w-32 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
+        </div>
+        <div className="space-y-4">
+          {[1, 2].map((i) => (
+            <div key={i} className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+              <div className="flex justify-between items-center">
+                <div className="space-y-3 flex-1">
+                  <div className="h-5 w-1/3 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+                  <div className="h-4 w-1/2 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+                </div>
+                <div className="flex space-x-3">
+                  <div className="h-8 w-20 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+                  <div className="h-8 w-20 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// Settings Tab Component
+function SettingsTab() {
+  return (
+    <Card className="p-6">
+      <h3 className="text-lg font-semibold mb-6">League Settings</h3>
+      <div className="space-y-6">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="flex items-center justify-between">
+            <div>
+              <div className="h-5 w-32 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+              <div className="mt-1 h-4 w-48 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+            </div>
+            <div className="h-8 w-48 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+export default function LeaguePage() {
+  const { t } = useTranslations();
+  
+  const tabs: Tab[] = [
+    {
+      id: 'dashboard',
+      label: t('common.tabs.dashboard'),
+      content: <DashboardTab />
+    },
+    {
+      id: 'matchup',
+      label: t('common.tabs.matchup'),
+      content: <MatchupTab />
+    },
+    {
+      id: 'team',
+      label: t('common.tabs.team'),
+      content: <TeamTab />
+    },
+    {
+      id: 'trades',
+      label: t('common.tabs.trades'),
+      content: <TradesTab />
+    },
+    {
+      id: 'settings',
+      label: t('common.tabs.settings'),
+      content: <SettingsTab />
+    }
+  ];
+
+  return (
+    <div className="container mx-auto p-6">
+      <Tabs tabs={tabs} variant="default" />
     </div>
   );
 } 

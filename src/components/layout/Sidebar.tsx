@@ -48,13 +48,11 @@ export default function Sidebar() {
     }
 
     async function getProfile() {
-      if (!user) return;
-
       try {
         const { data, error } = await supabase
           .from('profiles')
           .select('username, full_name, avatar_url')
-          .eq('id', user.id)
+          .eq('id', user?.id)
           .single();
 
         if (error) throw error;
@@ -64,80 +62,96 @@ export default function Sidebar() {
       }
     }
 
-    getProfile();
+    if (user) {
+      getProfile();
+    }
   }, [user, loading, router]);
 
-  if (loading || !user) {
-    return null;
-  }
-
   return (
-    <div className="flex h-screen flex-col justify-between border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-      <div className="px-4 py-6">
-        <div className="flex items-center justify-between mb-8">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="h-10 w-10 rounded-lg bg-blue-600" />
-            <span className="text-xl font-bold text-gray-900 dark:text-white">Fantasy Basketball</span>
-          </Link>
-        </div>
-
-        <nav className="flex flex-1 flex-col">
-          <ul role="list" className="flex flex-1 flex-col gap-y-4">
-            {navigation.map((item) => {
-              const isActive = pathname === item.href;
-              return (
-                <li key={item.name}>
-                  <Link
-                    href={item.href}
-                    className={`
-                      group flex gap-x-3 rounded-md p-2 text-sm font-semibold leading-6
-                      ${isActive 
-                        ? 'bg-gray-50 dark:bg-gray-800 text-blue-600' 
-                        : 'text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-500 hover:bg-gray-50 dark:hover:bg-gray-800'
-                      }
-                    `}
-                  >
-                    <item.icon className="h-6 w-6 shrink-0" aria-hidden="true" />
-                    {t(item.name)}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
-      </div>
-
-      <div className="sticky inset-x-0 bottom-0 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
-        <Link
-          href="/profile"
-          className="flex items-center gap-4 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg p-2"
+    <nav 
+      className="group h-full bg-gray-900 transition-all duration-300 ease-in-out w-14 hover:w-56"
+      style={{ willChange: 'width' }}
+    >
+      <div className="h-full flex flex-col">
+        {/* App Logo/Title */}
+        <Link 
+          href="/dashboard" 
+          className={cn(
+            'p-3 flex items-center space-x-3 transition-all duration-200 rounded-md',
+            'active:scale-95',
+            pathname.startsWith('/dashboard')
+              ? 'bg-gray-800 text-white'
+              : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+          )}
         >
-          <div className="relative h-10 w-10 flex-shrink-0">
-            {profile?.avatar_url ? (
-              <Image
-                src={profile.avatar_url}
-                alt={profile.full_name || t('common.navigation.viewProfile')}
-                fill
-                className="rounded-full object-cover"
-              />
-            ) : (
-              <div className="h-10 w-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                <span className="text-lg font-medium text-gray-600 dark:text-gray-400">
-                  {(profile?.full_name || profile?.username || 'U').charAt(0)}
-                </span>
-              </div>
-            )}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-              {profile?.username || 'User'}
-            </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              {t('common.navigation.viewProfile')}
-            </p>
+          <div className="min-w-[28px] h-8 bg-blue-600 rounded flex-shrink-0"></div>
+          <div className="whitespace-nowrap overflow-hidden transition-all duration-300 opacity-0 group-hover:opacity-100">
+            <h1 className="text-white font-bold">VorpBall</h1>
           </div>
         </Link>
+
+        {/* Navigation Links */}
+        <div className="flex-1 space-y-1">
+          {navigation.map((item) => {
+            const isActive = pathname.startsWith(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  'flex items-center h-10 w-full',
+                  'text-sm font-medium rounded-md transition-all duration-200',
+                  'whitespace-nowrap overflow-hidden',
+                  'active:scale-95',
+                  isActive
+                    ? 'bg-gray-800 text-white'
+                    : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                )}
+              >
+                <div className="w-14 flex items-center justify-center flex-shrink-0">
+                  <item.icon className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 pr-4">
+                  {t(item.name)}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+
+        {/* User Profile */}
+        <Link
+          href="/profile"
+          className={cn(
+            'flex items-center h-16 w-full',
+            'text-sm font-medium transition-all duration-200',
+            'whitespace-nowrap overflow-hidden',
+            'active:scale-95',
+            pathname.startsWith('/profile')
+              ? 'bg-gray-800 text-white'
+              : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+          )}
+        >
+          <div className="w-14 flex items-center justify-center flex-shrink-0">
+            <div className="relative w-8 h-8">
+              {profile?.avatar_url ? (
+                <Image
+                  src={profile.avatar_url}
+                  alt={profile?.username || 'User'}
+                  fill
+                  className="rounded-full"
+                />
+              ) : (
+                <div className="w-full h-full bg-gray-700 rounded-full" />
+              )}
+              <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-gray-900" />
+            </div>
+          </div>
+          <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 pr-4">
+            {profile?.username || 'User'}
+          </span>
+        </Link>
       </div>
-    </div>
+    </nav>
   );
 } 
