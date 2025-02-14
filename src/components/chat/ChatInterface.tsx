@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -8,6 +8,7 @@ import { useRealtimeSubscription } from '@/lib/hooks/useRealtimeSubscription';
 import { User } from '@supabase/supabase-js';
 import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { useTranslations } from '@/lib/i18n';
+import Image from 'next/image';
 
 interface Channel {
   id: string;
@@ -104,10 +105,10 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
   }, [leagueId]);
 
   // Function to check if user can post in current channel
-  const canPostInChannel = (channel: Channel) => {
+  const canPostInChannel = useCallback((channel: Channel) => {
     if (!channel || !userRole) return false;
     return channel.permissions === 'everyone' || (channel.permissions === 'admin' && userRole === 'admin');
-  };
+  }, [userRole]);
 
   // Update canPost when channel or userRole changes
   useEffect(() => {
@@ -117,7 +118,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
         setCanPost(canPostInChannel(channel));
       }
     }
-  }, [currentChannel, channels, userRole]);
+  }, [currentChannel, channels, canPostInChannel]);
 
   // Fetch channels on mount
   useEffect(() => {
@@ -236,8 +237,8 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
       event: 'INSERT',
       filter: `channel_id=eq.${currentChannel}`,
       callback: async (payload) => {
+        if (!payload.new || !('user_id' in payload.new)) return;
         const newMessage = payload.new;
-        if (!newMessage) return;
         
         // Fetch the user profile
         const { data: profileData, error: profileError } = await supabase
@@ -531,9 +532,11 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
                         <div className="flex-shrink-0 relative top-2">
                           <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
                             {message.user.avatar_url ? (
-                              <img
+                              <Image
                                 src={message.user.avatar_url}
                                 alt={message.user.username}
+                                width={32}
+                                height={32}
                                 className="w-full h-full object-cover"
                               />
                             ) : (
