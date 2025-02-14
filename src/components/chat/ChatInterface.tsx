@@ -42,6 +42,15 @@ interface ChatInterfaceProps {
   className?: string;
 }
 
+type PresenceState<T> = Record<string, T[]>;
+
+// Add new type for broadcast payload
+type BroadcastPayload = {
+  type: 'broadcast';
+  event: string;
+  payload: any;
+};
+
 export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [currentChannel, setCurrentChannel] = useState<string | null>(null);
@@ -252,44 +261,78 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
     [currentChannel]
   );
 
-  // Replace the typing subscription effect with useRealtimeSubscription
-  useRealtimeSubscription<TypingUser>(
-    {
-      channel: `typing:${currentChannel}`,
-      event: 'sync',
-      callback: (payload) => {
-        if (!payload) return;
-        
-        // Convert presence state to array of typing users
-        const currentTyping = Object.values(payload).flat();
-        
-        // Filter out stale typing indicators
-        const now = Date.now();
-        setTypingUsers(
-          currentTyping.filter(typingUser => 
-            typingUser &&
-            typingUser.channel_id === currentChannel &&
-            now - new Date(typingUser.last_typed).getTime() < 3000
-          )
-        );
-      }
-    },
-    [currentChannel]
-  );
+  // Update the typing events subscription to filter out current user
+  useEffect(() => {
+    if (!currentChannel) return;
 
-  // Update the typing status function to use the subscription
+    // Get current user ID first
+    const getCurrentUserId = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      return user?.id;
+    };
+
+    // Create a broadcast channel for typing indicators
+    const channel = supabase.channel(`typing:${currentChannel}`, {
+      config: {
+        broadcast: { self: false }
+      }
+    });
+
+    // Subscribe to typing events
+    channel
+      .on('broadcast', { event: 'typing' }, async ({ payload }) => {
+        const typingUser = payload as TypingUser;
+        const currentUserId = await getCurrentUserId();
+        
+        // Don't show typing indicator for current user
+        if (typingUser.user_id === currentUserId) return;
+        
+        setTypingUsers(prev => {
+          const now = Date.now();
+          // Remove stale typing indicators (older than 3 seconds)
+          const filtered = prev.filter(user => 
+            user.user_id !== typingUser.user_id && // Remove previous entry for this user
+            now - new Date(user.last_typed).getTime() < 3000 // Keep only recent typing indicators
+          );
+          
+          // Add new typing user
+          return [...filtered, typingUser];
+        });
+      })
+      .on('broadcast', { event: 'stop_typing' }, async ({ payload }) => {
+        const typingUser = payload as TypingUser;
+        // Remove the user from typing users
+        setTypingUsers(prev => prev.filter(user => user.user_id !== typingUser.user_id));
+      })
+      .subscribe();
+
+    // Set up interval to clean up stale typing indicators
+    const cleanupInterval = setInterval(() => {
+      setTypingUsers(prev => {
+        const now = Date.now();
+        return prev.filter(user => 
+          now - new Date(user.last_typed).getTime() < 3000
+        );
+      });
+    }, 1000);
+
+    // Cleanup on unmount or channel change
+    return () => {
+      clearInterval(cleanupInterval);
+      channel.unsubscribe();
+    };
+  }, [currentChannel]);
+
+  // Update the typing status function
   const updateTypingStatus = async () => {
     const now = Date.now();
-    if (now - lastTypedRef.current < 1000) return; // Throttle updates
+    if (now - lastTypedRef.current < 1000) return;
     lastTypedRef.current = now;
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user || !currentChannel) return;
 
     try {
-      const channel = supabase.channel(`typing:${currentChannel}`);
-      
-      // Get the user's profile for the correct username
       const { data: profile } = await supabase
         .from('profiles')
         .select('username')
@@ -298,29 +341,20 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
 
       if (!profile?.username) return;
 
-      // Subscribe and track in sequence
-      await channel.subscribe();
-      await channel.track({
-        user_id: user.id,
-        username: profile.username,
-        channel_id: currentChannel,
-        last_typed: new Date().toISOString()
-      });
+      // Get the channel instance
+      const channel = supabase.channel(`typing:${currentChannel}`);
 
-      // Clear previous timeout
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-
-      // Set timeout to clear typing status
-      typingTimeoutRef.current = setTimeout(async () => {
-        try {
-          await channel.untrack();
-          await channel.unsubscribe();
-        } catch (err) {
-          console.error('Error cleaning up typing status:', err);
+      // Broadcast typing status
+      await channel.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: {
+          user_id: user.id,
+          username: profile.username,
+          channel_id: currentChannel,
+          last_typed: new Date().toISOString()
         }
-      }, 3000);
+      });
     } catch (err) {
       console.error('Error updating typing status:', err);
     }
@@ -342,6 +376,34 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
       if (!user) {
         setError('You must be logged in to send messages.');
         return;
+      }
+
+      // Clear typing indicator for this user immediately
+      setTypingUsers(prev => prev.filter(u => u.user_id !== user.id));
+
+      // Send stop typing broadcast
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', user.id)
+          .single();
+
+        if (profile?.username) {
+          const channel = supabase.channel(`typing:${currentChannel}`);
+          await channel.send({
+            type: 'broadcast',
+            event: 'stop_typing',
+            payload: {
+              user_id: user.id,
+              username: profile.username,
+              channel_id: currentChannel,
+              last_typed: new Date().toISOString()
+            }
+          });
+        }
+      } catch (err) {
+        console.error('Error sending stop typing broadcast:', err);
       }
 
       const { error: sendError } = await supabase
@@ -501,8 +563,18 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
                     </div>
                   );
                 })}
+                <div ref={messagesEndRef} />
+              </div>
+            )}
+          </CustomScrollArea>
+
+          {/* Message Input */}
+          <div className="p-4 border-t border-gray-300/50 dark:border-gray-700/30">
+            {currentChannel && channels.find(c => c.id === currentChannel) && (
+              <>
+                {/* Move typing indicator here, above the input */}
                 {typingUsers.length > 0 && (
-                  <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                  <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-2">
                     <div className="flex gap-1">
                       <span className="animate-bounce">•</span>
                       <span className="animate-bounce [animation-delay:0.2s]">•</span>
@@ -517,15 +589,6 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
                     </span>
                   </div>
                 )}
-                <div ref={messagesEndRef} />
-              </div>
-            )}
-          </CustomScrollArea>
-
-          {/* Message Input */}
-          <div className="p-4 border-t border-gray-300/50 dark:border-gray-700/30">
-            {currentChannel && channels.find(c => c.id === currentChannel) && (
-              <>
                 {!canPost ? (
                   <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-2">
                     You don't have permission to post in this channel
