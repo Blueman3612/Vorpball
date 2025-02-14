@@ -278,7 +278,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
     });
 
     channel
-      .on('broadcast', { event: 'typing' }, (payload: { type: 'broadcast', event: string, payload: TypingUser }) => {
+      .on('broadcast' as 'system', { event: 'typing' }, (payload: BroadcastEvent) => {
         // Don't show typing indicator for current user
         if (currentUserId && payload.payload.user_id === currentUserId) return;
         
@@ -291,7 +291,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
           return [...filtered, payload.payload];
         });
       })
-      .on('broadcast', { event: 'stop_typing' }, (payload: { type: 'broadcast', event: string, payload: TypingUser }) => {
+      .on('broadcast' as 'system', { event: 'stop_typing' }, (payload: BroadcastEvent) => {
         // Don't process stop typing for current user (handled in send message)
         if (currentUserId && payload.payload.user_id === currentUserId) return;
         
