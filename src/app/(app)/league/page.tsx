@@ -103,7 +103,7 @@ export default function LeaguePage() {
                   }
 
                   // Check if user is already a member
-                  const { data: existingMember, error: memberError } = await supabase
+                  const { data: existingMember } = await supabase
                     .from('league_members')
                     .select('id')
                     .eq('league_id', invite.league_id)

@@ -7,9 +7,8 @@ import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
-import { cn } from '@/lib/utils';
-import { ChatInterface } from '@/components/chat/ChatInterface';
 import { addToast } from '@/components/ui/toast';
+import { ChatInterface } from '@/components/chat/ChatInterface';
 
 // Dashboard Tab Component
 function DashboardTab() {

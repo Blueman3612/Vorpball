@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase/client';
 
-interface SubscriptionConfig<T extends Record<string, any>> {
+interface SubscriptionConfig<T extends Record<string, unknown>> {
   channel: string;
   table: string;
   event: 'INSERT' | 'UPDATE' | 'DELETE';
@@ -10,7 +10,7 @@ interface SubscriptionConfig<T extends Record<string, any>> {
   callback: (payload: RealtimePostgresChangesPayload<T>) => void;
 }
 
-export function useRealtimeSubscription<T extends Record<string, any>>(
+export function useRealtimeSubscription<T extends Record<string, unknown>>(
   config: SubscriptionConfig<T>,
   deps: React.DependencyList = []
 ) {
@@ -29,7 +29,7 @@ export function useRealtimeSubscription<T extends Record<string, any>>(
         table: configRef.current.table,
         filter: configRef.current.filter,
       },
-      (payload: unknown) => configRef.current.callback(payload as RealtimePostgresChangesPayload<T>)
+      (payload: RealtimePostgresChangesPayload<T>) => configRef.current.callback(payload)
     )
     .subscribe();
 

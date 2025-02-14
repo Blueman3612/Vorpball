@@ -5,7 +5,6 @@ import { CustomScrollArea } from '@/components/ui/custom-scroll-area';
 import { useRealtimeSubscription } from '@/lib/hooks/useRealtimeSubscription';
 import { useTranslations } from '@/lib/i18n';
 import Image from 'next/image';
-import { RealtimeChannel } from '@supabase/supabase-js';
 
 interface Channel {
   id: string;
