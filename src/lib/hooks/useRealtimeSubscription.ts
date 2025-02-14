@@ -15,19 +15,21 @@ export function useRealtimeSubscription<T extends Record<string, any>>(
   deps: React.DependencyList = []
 ) {
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const configRef = useRef(config);
+  configRef.current = config;
 
   useEffect(() => {
-    const channel = supabase.channel(config.channel);
+    const channel = supabase.channel(configRef.current.channel);
     
     channel.on(
       'postgres_changes' as unknown as 'system',
       {
-        event: config.event,
+        event: configRef.current.event,
         schema: 'public',
-        table: config.table,
-        filter: config.filter,
+        table: configRef.current.table,
+        filter: configRef.current.filter,
       },
-      (payload: unknown) => config.callback(payload as RealtimePostgresChangesPayload<T>)
+      (payload: unknown) => configRef.current.callback(payload as RealtimePostgresChangesPayload<T>)
     )
     .subscribe();
 
@@ -38,7 +40,7 @@ export function useRealtimeSubscription<T extends Record<string, any>>(
         channelRef.current.unsubscribe();
       }
     };
-  }, [...deps]);
+  }, deps);
 
   return channelRef.current;
 } 

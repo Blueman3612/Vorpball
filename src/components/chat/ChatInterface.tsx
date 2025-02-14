@@ -1,14 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase/client';
 import { CustomScrollArea } from '@/components/ui/custom-scroll-area';
 import { useRealtimeSubscription } from '@/lib/hooks/useRealtimeSubscription';
-import { User } from '@supabase/supabase-js';
-import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { useTranslations } from '@/lib/i18n';
 import Image from 'next/image';
+import { RealtimeChannel } from '@supabase/supabase-js';
 
 interface Channel {
   id: string;
@@ -39,19 +36,16 @@ interface TypingUser {
   last_typed: string;
 }
 
+interface PresencePayload {
+  type: 'broadcast';
+  event: 'typing' | 'stop_typing';
+  payload: TypingUser;
+}
+
 interface ChatInterfaceProps {
   leagueId: string;
   className?: string;
 }
-
-type PresenceState<T> = Record<string, T[]>;
-
-// Add new type for broadcast payload
-type BroadcastPayload = {
-  type: 'broadcast';
-  event: string;
-  payload: any;
-};
 
 export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
   const { t } = useTranslations();
@@ -67,7 +61,6 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
-  const typingTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const lastTypedRef = useRef<number>(0);
 
   // Scroll to bottom of messages
@@ -264,52 +257,49 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
     [currentChannel]
   );
 
-  // Update the typing events subscription to filter out current user
+  // Update the typing events subscription
   useEffect(() => {
     if (!currentChannel) return;
 
-    // Get current user ID first
-    const getCurrentUserId = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      return user?.id;
-    };
-
-    // Create a broadcast channel for typing indicators
     const channel = supabase.channel(`typing:${currentChannel}`, {
       config: {
         broadcast: { self: false }
       }
     });
 
-    // Subscribe to typing events
+    // Get current user ID once for the subscription
+    const getCurrentUserId = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      return user?.id;
+    };
+
+    let currentUserId: string | undefined;
+    getCurrentUserId().then(id => {
+      currentUserId = id;
+    });
+
     channel
-      .on('broadcast', { event: 'typing' }, async ({ payload }) => {
-        const typingUser = payload as TypingUser;
-        const currentUserId = await getCurrentUserId();
-        
+      .on('broadcast', { event: 'typing' }, (payload: { type: 'broadcast', event: string, payload: TypingUser }) => {
         // Don't show typing indicator for current user
-        if (typingUser.user_id === currentUserId) return;
+        if (currentUserId && payload.payload.user_id === currentUserId) return;
         
         setTypingUsers(prev => {
           const now = Date.now();
-          // Remove stale typing indicators (older than 3 seconds)
           const filtered = prev.filter(user => 
-            user.user_id !== typingUser.user_id && // Remove previous entry for this user
-            now - new Date(user.last_typed).getTime() < 3000 // Keep only recent typing indicators
+            user.user_id !== payload.payload.user_id && 
+            now - new Date(user.last_typed).getTime() < 3000
           );
-          
-          // Add new typing user
-          return [...filtered, typingUser];
+          return [...filtered, payload.payload];
         });
       })
-      .on('broadcast', { event: 'stop_typing' }, async ({ payload }) => {
-        const typingUser = payload as TypingUser;
-        // Remove the user from typing users
-        setTypingUsers(prev => prev.filter(user => user.user_id !== typingUser.user_id));
+      .on('broadcast', { event: 'stop_typing' }, (payload: { type: 'broadcast', event: string, payload: TypingUser }) => {
+        // Don't process stop typing for current user (handled in send message)
+        if (currentUserId && payload.payload.user_id === currentUserId) return;
+        
+        setTypingUsers(prev => prev.filter(user => user.user_id !== payload.payload.user_id));
       })
       .subscribe();
 
-    // Set up interval to clean up stale typing indicators
     const cleanupInterval = setInterval(() => {
       setTypingUsers(prev => {
         const now = Date.now();
@@ -319,7 +309,6 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
       });
     }, 1000);
 
-    // Cleanup on unmount or channel change
     return () => {
       clearInterval(cleanupInterval);
       channel.unsubscribe();
@@ -420,6 +409,9 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
       if (sendError) throw sendError;
 
       setMessageInput('');
+      // Reset last typed time to prevent immediate typing indicator after sending
+      lastTypedRef.current = 0;
+      
       // Ensure input maintains focus and restore cursor position
       requestAnimationFrame(() => {
         currentInput?.focus();
