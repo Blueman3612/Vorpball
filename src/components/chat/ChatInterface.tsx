@@ -35,7 +35,7 @@ interface TypingUser {
   last_typed: string;
 }
 
-interface PresencePayload {
+interface BroadcastEvent {
   type: 'broadcast';
   event: 'typing' | 'stop_typing';
   payload: TypingUser;

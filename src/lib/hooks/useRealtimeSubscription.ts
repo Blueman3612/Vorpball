@@ -19,28 +19,27 @@ export function useRealtimeSubscription<T extends Record<string, unknown>>(
   configRef.current = config;
 
   useEffect(() => {
-    const channel = supabase.channel(configRef.current.channel);
+    const channel = supabase.channel(config.channel);
     
     channel.on(
       'postgres_changes' as unknown as 'system',
       {
-        event: configRef.current.event,
+        event: config.event,
         schema: 'public',
-        table: configRef.current.table,
-        filter: configRef.current.filter,
+        table: config.table,
+        filter: config.filter,
       },
-      (payload: RealtimePostgresChangesPayload<T>) => configRef.current.callback(payload)
+      (payload: RealtimePostgresChangesPayload<T>) => config.callback(payload)
     )
     .subscribe();
 
     channelRef.current = channel;
 
     return () => {
-      if (channelRef.current) {
-        channelRef.current.unsubscribe();
-      }
+      channel.unsubscribe();
     };
-  }, deps);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config.channel, config.event, config.table, config.filter, ...deps]);
 
   return channelRef.current;
 } 
