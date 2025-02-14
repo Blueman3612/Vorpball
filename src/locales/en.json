@@ -12,7 +12,12 @@
       "saveChanges": "Save Changes",
       "savingChanges": "Saving Changes...",
       "clearAll": "Clear All",
-      "reset": "Reset"
+      "reset": "Reset",
+      "inviteMember": "Invite Member",
+      "sendMessage": "Send a message...",
+      "addTeamToTrade": "Add Team to Trade",
+      "addPlayer": "Add Player",
+      "proposeTrade": "Propose Trade"
     },
     "navigation": {
       "league": "League",
@@ -26,7 +31,9 @@
       "loading": "Loading...",
       "saving": "Saving...",
       "uploading": "Uploading...",
-      "creating": "Creating..."
+      "creating": "Creating...",
+      "loadingChannels": "Loading channels...",
+      "loadingLeague": "Loading league..."
     },
     "errors": {
       "notFound": "Not found",
@@ -35,12 +42,18 @@
       "saveFailed": "Failed to save changes",
       "updateFailed": "Failed to update preference",
       "photoUpdateFailed": "Failed to update profile photo",
-      "signOutFailed": "Failed to sign out"
+      "signOutFailed": "Failed to sign out",
+      "loginRequired": "You must be logged in to view channels.",
+      "unexpectedError": "An unexpected error occurred. Please try again later.",
+      "noAccess": "You do not have access to this league.",
+      "inviteGenerationFailed": "Failed to generate invite code",
+      "noPostPermission": "You don't have permission to post in this channel"
     },
     "success": {
       "changesSaved": "Changes saved successfully",
       "preferenceUpdated": "Preference updated",
-      "photoUpdated": "Profile photo updated successfully"
+      "photoUpdated": "Profile photo updated successfully",
+      "inviteCopied": "Invite code copied to clipboard!"
     },
     "languages": {
       "title": "Language",
@@ -69,6 +82,26 @@
       "trades": "Trades",
       "settings": "Settings",
       "talk": "Talk"
+    },
+    "chat": {
+      "channels": "Channels",
+      "noMessages": "No messages yet",
+      "typingIndicator": {
+        "single": "{username} is typing...",
+        "double": "{username1} and {username2} are typing...",
+        "multiple": "{count} people are typing..."
+      }
+    },
+    "sections": {
+      "leagueStandings": "League Standings",
+      "recentActivity": "Recent Activity",
+      "leagueCalendar": "League Calendar",
+      "myRoster": "My Roster",
+      "createTrade": "Create Trade",
+      "pendingTrades": "Pending Trades",
+      "leagueSettings": "League Settings",
+      "selectPlayersToTrade": "Select players to trade",
+      "noPendingTrades": "No pending trades"
     }
   },
   "auth": {

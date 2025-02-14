@@ -71,7 +71,11 @@ export default function Sidebar() {
 
   return (
     <nav 
-      className="group h-full bg-gray-900 transition-all duration-300 ease-in-out w-14 hover:w-56"
+      className={cn(
+        "group h-full transition-all duration-300 ease-in-out w-14 hover:w-56",
+        "bg-white dark:bg-gray-900",
+        "border-r border-gray-200 dark:border-gray-800"
+      )}
       style={{ willChange: 'width' }}
     >
       <div className="h-full flex flex-col">
@@ -82,13 +86,13 @@ export default function Sidebar() {
             'p-3 flex items-center space-x-3 transition-all duration-200 rounded-md',
             'active:scale-95',
             pathname.startsWith('/dashboard')
-              ? 'bg-gray-800 text-white'
-              : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+              ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+              : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
           )}
         >
           <div className="min-w-[28px] h-8 bg-blue-600 rounded flex-shrink-0"></div>
           <div className="whitespace-nowrap overflow-hidden transition-all duration-300 opacity-0 group-hover:opacity-100">
-            <h1 className="text-white font-bold">VorpBall</h1>
+            <h1 className="text-gray-900 dark:text-white font-bold">VorpBall</h1>
           </div>
         </Link>
 
@@ -106,8 +110,8 @@ export default function Sidebar() {
                   'whitespace-nowrap overflow-hidden',
                   'active:scale-95',
                   isActive
-                    ? 'bg-gray-800 text-white'
-                    : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                    ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
                 )}
               >
                 <div className="w-14 flex items-center justify-center flex-shrink-0">
@@ -130,8 +134,8 @@ export default function Sidebar() {
             'whitespace-nowrap overflow-hidden',
             'active:scale-95',
             pathname.startsWith('/profile')
-              ? 'bg-gray-800 text-white'
-              : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+              ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+              : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
           )}
         >
           <div className="w-14 flex items-center justify-center flex-shrink-0">
@@ -144,9 +148,9 @@ export default function Sidebar() {
                   className="rounded-full"
                 />
               ) : (
-                <div className="w-full h-full bg-gray-700 rounded-full" />
+                <div className="w-full h-full bg-gray-200 dark:bg-gray-700 rounded-full" />
               )}
-              <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-gray-900" />
+              <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white dark:border-gray-900" />
             </div>
           </div>
           <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 pr-4">

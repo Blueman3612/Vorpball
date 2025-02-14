@@ -7,6 +7,7 @@ import { CustomScrollArea } from '@/components/ui/custom-scroll-area';
 import { useRealtimeSubscription } from '@/lib/hooks/useRealtimeSubscription';
 import { User } from '@supabase/supabase-js';
 import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
+import { useTranslations } from '@/lib/i18n';
 
 interface Channel {
   id: string;
@@ -52,6 +53,7 @@ type BroadcastPayload = {
 };
 
 export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
+  const { t } = useTranslations();
   const [channels, setChannels] = useState<Channel[]>([]);
   const [currentChannel, setCurrentChannel] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -435,7 +437,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
       <div className="h-full flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 border-3 border-gray-300 border-t-primary-600 rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-500 dark:text-gray-400">Loading channels...</p>
+          <p className="text-gray-500 dark:text-gray-400">{t('common.states.loadingChannels')}</p>
         </div>
       </div>
     );
@@ -462,7 +464,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
         {/* Channels Sidebar */}
         <div className="w-60 flex-shrink-0 border-r border-gray-300/50 dark:border-gray-700/30">
           <div className="p-4 border-b border-gray-300/50 dark:border-gray-700/30">
-            <h3 className="text-base font-medium text-gray-900 dark:text-gray-100">Channels</h3>
+            <h3 className="text-base font-medium text-gray-900 dark:text-gray-100">{t('common.chat.channels')}</h3>
           </div>
           <CustomScrollArea className="h-[calc(100%-4rem)]">
             {channels.map((channel) => (
@@ -512,7 +514,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
           <CustomScrollArea className="flex-1 p-4">
             {messages.length === 0 ? (
               <div className="text-sm text-gray-600 dark:text-gray-400">
-                No messages yet
+                {t('common.chat.noMessages')}
               </div>
             ) : (
               <div className="space-y-2">
@@ -582,16 +584,19 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
                     </div>
                     <span>
                       {typingUsers.length === 1 
-                        ? `${typingUsers[0].username} is typing...`
+                        ? t('common.chat.typingIndicator.single', { username: typingUsers[0].username })
                         : typingUsers.length === 2
-                        ? `${typingUsers[0].username} and ${typingUsers[1].username} are typing...`
-                        : `${typingUsers.length} people are typing...`}
+                        ? t('common.chat.typingIndicator.double', { 
+                            username1: typingUsers[0].username,
+                            username2: typingUsers[1].username 
+                          })
+                        : t('common.chat.typingIndicator.multiple', { count: typingUsers.length })}
                     </span>
                   </div>
                 )}
                 {!canPost ? (
                   <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-2">
-                    You don't have permission to post in this channel
+                    {t('common.errors.noPostPermission')}
                   </div>
                 ) : (
                   <form onSubmit={handleSendMessage}>
@@ -599,7 +604,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
                       <input
                         ref={inputRef}
                         type="text"
-                        placeholder="Send a message..."
+                        placeholder={t('common.actions.sendMessage')}
                         value={messageInput}
                         onChange={(e) => {
                           setMessageInput(e.target.value);

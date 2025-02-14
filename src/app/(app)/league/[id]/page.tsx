@@ -13,15 +13,16 @@ import { addToast } from '@/components/ui/toast';
 
 // Dashboard Tab Component
 function DashboardTab() {
+  const { t } = useTranslations();
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4">League Standings</h3>
+          <h3 className="text-lg font-semibold mb-4">{t('common.sections.leagueStandings')}</h3>
           <div className="h-48 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
         </Card>
         <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4">Recent Activity</h3>
+          <h3 className="text-lg font-semibold mb-4">{t('common.sections.recentActivity')}</h3>
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
               <div key={i} className="h-8 bg-gray-100 dark:bg-gray-800 rounded animate-pulse" />
@@ -29,7 +30,7 @@ function DashboardTab() {
           </div>
         </Card>
         <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4">League Calendar</h3>
+          <h3 className="text-lg font-semibold mb-4">{t('common.sections.leagueCalendar')}</h3>
           <div className="h-48 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
         </Card>
       </div>
@@ -59,10 +60,11 @@ function MatchupTab() {
 
 // Team Tab Component
 function TeamTab() {
+  const { t } = useTranslations();
   return (
     <div className="space-y-6">
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">My Roster</h3>
+        <h3 className="text-lg font-semibold mb-4">{t('common.sections.myRoster')}</h3>
         <div className="space-y-4">
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="flex items-center space-x-4">
@@ -82,8 +84,9 @@ function TeamTab() {
 
 // Trades Tab Component
 function TradesTab() {
+  const { t } = useTranslations();
   const [teams, setTeams] = useState([
-    { id: 'user', name: 'Your Team' } // Start with user's team
+    { id: 'user', name: 'Your Team' }
   ]);
   const [isAddingTeam, setIsAddingTeam] = useState(false);
 
@@ -95,7 +98,7 @@ function TradesTab() {
     <div className="space-y-6">
       <Card className="p-6">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold">Create Trade</h3>
+          <h3 className="text-lg font-semibold">{t('common.sections.createTrade')}</h3>
           <Button
             variant="outline"
             size="sm"
@@ -106,7 +109,7 @@ function TradesTab() {
             <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
             </svg>
-            Add Team to Trade
+            {t('common.actions.addTeamToTrade')}
           </Button>
         </div>
 
@@ -132,20 +135,19 @@ function TradesTab() {
                   )}
                 </div>
 
-                {/* Placeholder for player selection */}
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                     <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
                     </svg>
-                    Select players to trade
+                    {t('common.sections.selectPlayersToTrade')}
                   </div>
                   <Button
                     variant="outline"
                     size="sm"
                     className="w-full justify-center"
                   >
-                    Add Player
+                    {t('common.actions.addPlayer')}
                   </Button>
                 </div>
               </div>
@@ -163,17 +165,16 @@ function TradesTab() {
               <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
               </svg>
-              Propose Trade
+              {t('common.actions.proposeTrade')}
             </Button>
           </div>
         )}
       </Card>
 
-      {/* Pending Trades Section */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-6">Pending Trades</h3>
+        <h3 className="text-lg font-semibold mb-6">{t('common.sections.pendingTrades')}</h3>
         <div className="text-sm text-gray-500 dark:text-gray-400">
-          No pending trades
+          {t('common.sections.noPendingTrades')}
         </div>
       </Card>
     </div>
@@ -193,9 +194,10 @@ function TalkTab() {
 
 // Settings Tab Component
 function SettingsTab() {
+  const { t } = useTranslations();
   return (
     <Card className="p-6">
-      <h3 className="text-lg font-semibold mb-6">League Settings</h3>
+      <h3 className="text-lg font-semibold mb-6">{t('common.sections.leagueSettings')}</h3>
       <div className="space-y-6">
         {[1, 2, 3, 4].map((i) => (
           <div key={i} className="flex items-center justify-between">
@@ -271,7 +273,7 @@ export default function LeaguePage() {
       <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
         <div className="text-center">
           <div className="w-12 h-12 border-3 border-gray-300 border-t-primary-600 rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-500 dark:text-gray-400">Loading league...</p>
+          <p className="text-gray-500 dark:text-gray-400">{t('common.states.loadingLeague')}</p>
         </div>
       </div>
     );
@@ -327,42 +329,43 @@ export default function LeaguePage() {
 
   return (
     <div className="mx-auto px-8 py-6">
-      {isAdmin && (
-        <div className="mb-6 flex justify-end">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={async () => {
-              try {
-                const { data, error } = await supabase
-                  .from('league_invites')
-                  .insert({
-                    league_id: leagueId
-                  })
-                  .select('code')
-                  .single();
+      <div className="relative">
+        {isAdmin && (
+          <div className="absolute right-0 -top-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                try {
+                  const { data, error } = await supabase
+                    .from('league_invites')
+                    .insert({
+                      league_id: leagueId
+                    })
+                    .select('code')
+                    .single();
 
-                if (error) throw error;
+                  if (error) throw error;
 
-                // Copy the invite code to clipboard
-                await navigator.clipboard.writeText(data.code);
-                addToast('Invite code copied to clipboard!', 'success');
-              } catch (error) {
-                console.error('Error generating invite:', error);
-                addToast('Failed to generate invite code', 'error');
-              }
-            }}
-            className="flex items-center gap-2"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M11 6a3 3 0 11-6 0 3 3 0 016 0zM14 17a6 6 0 00-12 0h12zM13 8a1 1 0 100 2 1 1 0 000-2zM18 10a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            Invite Member
-          </Button>
+                  await navigator.clipboard.writeText(data.code);
+                  addToast(t('common.success.inviteCopied'), 'success');
+                } catch (error) {
+                  console.error('Error generating invite:', error);
+                  addToast(t('common.errors.inviteGenerationFailed'), 'error');
+                }
+              }}
+              className="flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M11 6a3 3 0 11-6 0 3 3 0 016 0zM14 17a6 6 0 00-12 0h12zM13 8a1 1 0 100 2 1 1 0 000-2zM18 10a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              {t('common.actions.inviteMember')}
+            </Button>
+          </div>
+        )}
+
+        <Tabs tabs={tabs} variant="default" />
       </div>
-      )}
-
-      <Tabs tabs={tabs} variant="default" />
     </div>
   );
 } 
