@@ -173,7 +173,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
   };
 
   useEffect(() => {
-    // Only scroll to bottom when not in thread view and not updating from a thread reply
+    // Only scroll when not in thread view and not updating from a thread reply
     if (!threadView && !isThreadReplyUpdate.current) {
       scrollToBottom();
     } else {
@@ -231,7 +231,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
         if (userError) throw userError;
         if (!user) return;
 
-        const { data, error } = await supabase
+        const { data: roleData, error } = await supabase
           .from('league_members')
           .select('role')
           .eq('league_id', leagueId)
@@ -239,7 +239,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
           .single();
 
         if (error) throw error;
-        setUserRole(data.role);
+        setUserRole(roleData.role);
       } catch (err) {
         console.error('Error fetching user role:', err);
       }
@@ -1184,10 +1184,9 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
 
   // Add debug information about the viewport
   useEffect(() => {
-    const isMobile = window.innerWidth < 768; // 768px is the md breakpoint in Tailwind
-
     const handleResize = () => {
-      const isMobile = window.innerWidth < 768;
+      // Monitor window resize but don't need to track isMobile state
+      // as we rely on CSS media queries for responsive behavior
     };
     
     window.addEventListener('resize', handleResize);
