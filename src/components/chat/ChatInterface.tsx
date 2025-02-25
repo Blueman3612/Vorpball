@@ -5,6 +5,8 @@ import { CustomScrollArea } from '@/components/ui/custom-scroll-area';
 import { useRealtimeSubscription } from '@/lib/hooks/useRealtimeSubscription';
 import { useTranslations } from '@/lib/i18n';
 import Image from 'next/image';
+import { addToast } from '@/components/ui/toast';
+import { ConfirmationModal } from '@/components/ui/modal';
 
 interface Channel {
   id: string;
@@ -139,6 +141,13 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
   const [isSendingThreadReply, setIsSendingThreadReply] = useState(false);
   const threadMessagesEndRef = useRef<HTMLDivElement>(null);
   const threadInputRef = useRef<HTMLInputElement>(null);
+  
+  // Message deletion state
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [messageToDelete, setMessageToDelete] = useState<Message | null>(null);
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [isThreadMessage, setIsThreadMessage] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // Scroll to bottom of messages
   const scrollToBottom = () => {
@@ -799,6 +808,67 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
     }
   };
 
+  // Add effect to get and store current user ID
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data && data.user) {
+        setCurrentUserId(data.user.id);
+      }
+    };
+    
+    getCurrentUser();
+  }, []);
+
+  // Function to check if user can delete a message
+  const canDeleteMessage = useCallback((message: Message) => {
+    if (!userRole || !currentUserId) return false;
+    
+    // Admin can delete any message, user can only delete their own
+    return userRole === 'admin' || message.user_id === currentUserId;
+  }, [userRole, currentUserId]);
+
+  // Function to handle message deletion
+  const handleDeleteMessage = async () => {
+    if (!messageToDelete) return;
+    
+    try {
+      setIsDeleting(true);
+      
+      const { error: deleteError } = await supabase
+        .from('channel_messages')
+        .delete()
+        .eq('id', messageToDelete.id);
+      
+      if (deleteError) throw deleteError;
+      
+      // Update UI based on whether it's a thread message or main message
+      if (isThreadMessage) {
+        setThreadMessages(prev => prev.filter(m => m.id !== messageToDelete.id));
+      } else {
+        setMessages(prev => prev.filter(m => m.id !== messageToDelete.id));
+      }
+      
+      // Show success toast with translation
+      addToast(t('common.success.messageDeleted'), 'success');
+      
+    } catch (err) {
+      console.error('Error deleting message:', err);
+      addToast(t('common.errors.deleteFailed'), 'error');
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirmation(false);
+      setMessageToDelete(null);
+    }
+  };
+  
+  // Function to open delete confirmation
+  const openDeleteConfirmation = (message: Message, isThread: boolean = false) => {
+    setMessageToDelete(message);
+    setIsThreadMessage(isThread);
+    setShowDeleteConfirmation(true);
+  };
+
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -953,6 +1023,22 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
                                 <span className="text-xs font-medium">{message.reply_count}</span>
                               )}
                             </button>
+                            
+                            {/* Delete button - only visible to message author or admin */}
+                            {canDeleteMessage(message) && (
+                              <button 
+                                onClick={() => openDeleteConfirmation(message)}
+                                className={cn(
+                                  "p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-opacity",
+                                  "text-gray-500 dark:text-gray-400 opacity-0 group-hover:opacity-100"
+                                )}
+                                aria-label={t('common.actions.deleteMessage')}
+                              >
+                                <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                                </svg>
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1130,7 +1216,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
                         ) : (
                           <div className="w-6 flex-shrink-0" />
                         )}
-                        <div>
+                        <div className="flex-1">
                           {showHeader && (
                             <div className="flex items-baseline gap-2">
                               <span className="font-medium text-gray-900 dark:text-white text-sm">
@@ -1141,10 +1227,28 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
                               </span>
                             </div>
                           )}
-                          <p className={cn(
-                            "text-gray-800 dark:text-gray-200 text-sm",
-                            !showHeader && "pt-0"
-                          )}>{message.content}</p>
+                          <div className="flex items-start group">
+                            <p className={cn(
+                              "text-gray-800 dark:text-gray-200 text-sm",
+                              !showHeader && "pt-0"
+                            )}>{message.content}</p>
+                            
+                            {/* Delete button for thread messages */}
+                            {canDeleteMessage(message) && (
+                              <button 
+                                onClick={() => openDeleteConfirmation(message, true)}
+                                className={cn(
+                                  "p-1 ml-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-opacity",
+                                  "text-gray-500 dark:text-gray-400 opacity-0 group-hover:opacity-100"
+                                )}
+                                aria-label={t('common.actions.deleteMessage')}
+                              >
+                                <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
@@ -1328,10 +1432,28 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
                                 </span>
                               </div>
                             )}
-                            <p className={cn(
-                              "text-gray-800 dark:text-gray-200 text-sm",
-                              !showHeader && "pt-0"
-                            )}>{message.content}</p>
+                            <div className="flex items-start group">
+                              <p className={cn(
+                                "text-gray-800 dark:text-gray-200 text-sm",
+                                !showHeader && "pt-0"
+                              )}>{message.content}</p>
+                              
+                              {/* Delete button for mobile thread messages */}
+                              {canDeleteMessage(message) && (
+                                <button 
+                                  onClick={() => openDeleteConfirmation(message, true)}
+                                  className={cn(
+                                    "p-1 ml-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-opacity",
+                                    "text-gray-500 dark:text-gray-400 opacity-0 group-hover:opacity-100"
+                                  )}
+                                  aria-label={t('common.actions.deleteMessage')}
+                                >
+                                  <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                                  </svg>
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
                       );
@@ -1377,6 +1499,22 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
           </div>
         )}
       </div>
+
+      {/* Delete Message Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteConfirmation}
+        onClose={() => {
+          setShowDeleteConfirmation(false);
+          setMessageToDelete(null);
+        }}
+        onConfirm={handleDeleteMessage}
+        title={t('common.chat.deleteMessageTitle')}
+        description={t('common.chat.deleteMessageDescription')}
+        confirmText={t('common.actions.delete')}
+        cancelText={t('common.actions.cancel')}
+        isDestructive={true}
+        isLoading={isDeleting}
+      />
     </div>
   );
 } 
