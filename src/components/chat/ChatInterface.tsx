@@ -131,7 +131,6 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
   const [threadTypingUsers, setThreadTypingUsers] = useState<TypingUser[]>([]);
   const lastTypedRef = useRef<number>(0);
   const lastThreadTypedRef = useRef<number>(0);
-  const [leagueName, setLeagueName] = useState<string>("");
   
   // Thread-related state
   const [threadView, setThreadView] = useState<boolean>(false);
@@ -216,7 +215,6 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
           .single();
 
         if (error) throw error;
-        setLeagueName(data.name);
       } catch (err) {
         console.error('Error fetching league name:', err);
       }
@@ -1043,7 +1041,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
       // If this is a main message with replies, delete all replies first
       if (!isThreadMessage && messageToDelete.reply_count && messageToDelete.reply_count > 0) {
         // Delete all replies to this message first
-        const { error: deleteRepliesError, count: deletedRepliesCount } = await supabase
+        const { error: deleteRepliesError } = await supabase
           .from('channel_messages')
           .delete({ count: 'exact' })
           .eq('reply_to', messageToDelete.id);
