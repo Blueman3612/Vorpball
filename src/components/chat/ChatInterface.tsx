@@ -288,6 +288,11 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
   useEffect(() => {
     if (!currentChannel) return;
 
+    // Close any open thread when changing channels
+    if (threadView) {
+      closeThread();
+    }
+
     async function fetchMessages() {
       try {
         // First fetch messages
@@ -1446,61 +1451,49 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
         {/* Thread panel */}
         {threadView && (
           <div className="hidden md:flex flex-col w-[40%] border-l border-gray-300/50 dark:border-gray-700/30">
-            {/* Thread header */}
-            <div className="p-4 border-b border-gray-300/50 dark:border-gray-700/30">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    {activeThreadMessage?.threadLeagueName || leagueName}
-                  </h3>
-                  <span className="text-gray-600 dark:text-gray-400">
-                    • #{activeThreadMessage?.threadChannelName || channels.find(c => c.id === currentChannel)?.name}
-                  </span>
-                </div>
-                <button 
-                  onClick={closeThread} 
-                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                  aria-label="Close thread"
-                >
-                  <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
             {/* Original message */}
             {activeThreadMessage && (
               <div className="p-4 border-b border-gray-300/50 dark:border-gray-700/30">
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0">
-                    <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
-                      {activeThreadMessage.user.avatar_url ? (
-                        <Image
-                          src={activeThreadMessage.user.avatar_url}
-                          alt={activeThreadMessage.user.username}
-                          width={32}
-                          height={32}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
-                          {activeThreadMessage.user.username.charAt(0).toUpperCase()}
-                        </div>
-                      )}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0">
+                      <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                        {activeThreadMessage.user.avatar_url ? (
+                          <Image
+                            src={activeThreadMessage.user.avatar_url}
+                            alt={activeThreadMessage.user.username}
+                            width={32}
+                            height={32}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
+                            {activeThreadMessage.user.username.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex items-baseline gap-2">
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {activeThreadMessage.user.username}
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {formatTimestampWithBoldDate(activeThreadMessage.created_at)}
+                        </span>
+                      </div>
+                      <p className="text-gray-800 dark:text-gray-200">{activeThreadMessage.content}</p>
                     </div>
                   </div>
-                  <div>
-                    <div className="flex items-baseline gap-2">
-                      <span className="font-medium text-gray-900 dark:text-white">
-                        {activeThreadMessage.user.username}
-                      </span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {formatTimestampWithBoldDate(activeThreadMessage.created_at)}
-                      </span>
-                    </div>
-                    <p className="text-gray-800 dark:text-gray-200">{activeThreadMessage.content}</p>
-                  </div>
+                  <button 
+                    onClick={closeThread} 
+                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                    aria-label="Close thread"
+                  >
+                    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </button>
                 </div>
               </div>
             )}
@@ -1651,17 +1644,9 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
         {threadView && (
           <div className="md:hidden fixed inset-0 z-50 bg-black/50 dark:bg-black/70 flex items-center justify-center p-4">
             <div className="w-full max-w-lg bg-white dark:bg-gray-900 rounded-lg shadow-lg flex flex-col max-h-[90vh]">
-              {/* Thread header */}
+              {/* Mobile thread header - just keep close button */}
               <div className="p-4 border-b border-gray-300/50 dark:border-gray-700/30">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                      {activeThreadMessage?.threadLeagueName || leagueName}
-                    </h3>
-                    <span className="text-gray-600 dark:text-gray-400">
-                      • #{activeThreadMessage?.threadChannelName || channels.find(c => c.id === currentChannel)?.name}
-                    </span>
-                  </div>
+                <div className="flex items-center justify-end">
                   <button 
                     onClick={closeThread} 
                     className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
