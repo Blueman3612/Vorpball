@@ -194,7 +194,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
         scrollThreadToBottom();
       }, 50);
     }
-  }, [threadMessages]);
+  }, [threadMessages, threadView]);
 
   // Add a new effect to scroll when thread view is opened
   useEffect(() => {    
@@ -208,7 +208,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
   useEffect(() => {
     async function fetchLeagueName() {
       try {
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from('leagues')
           .select('name')
           .eq('id', leagueId)
