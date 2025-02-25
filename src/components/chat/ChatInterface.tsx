@@ -363,8 +363,9 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
 
         console.log('INSERT event received:', newMessage);
 
-        // Only add to messages if it's a top-level message
+        // Process messages based on whether they're replies or new messages
         if (newMessage.reply_to) {
+          // This is a reply to an existing message
           console.log(`Message ${newMessage.id} is a reply to ${newMessage.reply_to}`);
           
           // If we're viewing this thread, add the reply to the thread
@@ -407,40 +408,39 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
               return msg;
             });
             
-            // Return unchanged array if no message was updated to avoid re-render
-            if (updated.every((msg, i) => msg === prev[i])) {
-              console.log('No reply count updates needed in UI');
-              return prev;
-            }
-            
             return updated;
           });
+        } else {
+          // This is a new top-level message
+          console.log(`Message ${newMessage.id} is a top-level message`);
           
-          return;
+          // Fetch the user profile
+          const { data: profileData, error: profileError } = await supabase
+            .from('profiles')
+            .select('id, username, avatar_url')
+            .eq('id', newMessage.user_id)
+            .single();
+
+          if (profileError) {
+            console.error('Error fetching profile:', profileError);
+            return;
+          }
+
+          // Transform the data to match our Message interface
+          const typedMessage = {
+            ...newMessage,
+            user: profileData,
+            reply_count: 0
+          } as Message;
+
+          // Add the new message to our local state
+          setMessages(prev => [...prev, typedMessage]);
+          
+          // If we have new messages and the chat is scrolled near the bottom, scroll to bottom
+          if (messagesEndRef.current) {
+            scrollToBottom();
+          }
         }
-        
-        console.log(`New top-level message ${newMessage.id} received, fetching user profile`);
-        
-        // Fetch the user profile
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('id, username, avatar_url')
-          .eq('id', newMessage.user_id)
-          .single();
-
-        if (profileError) {
-          console.error('Error fetching profile:', profileError);
-          return;
-        }
-
-        // Transform the data to match our Message interface
-        const typedMessage = {
-          ...newMessage,
-          user: profileData
-        } as Message;
-
-        console.log(`Adding new message to UI: ${typedMessage.id}`);
-        setMessages(prev => [...prev, typedMessage]);
       }
     },
     [currentChannel, activeThreadMessage]
@@ -461,9 +461,15 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
       event: 'DELETE',
       filter: `channel_id=eq.${currentChannel}`,
       callback: (payload) => {
-        if (!payload.old || !('id' in payload.old)) return;
+        // Log the full payload for debugging
+        console.log('DELETE event full payload:', JSON.stringify(payload, null, 2));
         
-        console.log('DELETE event received:', payload.old);
+        if (!payload.old || !('id' in payload.old)) {
+          console.error('DELETE event received but payload.old is missing or invalid:', payload);
+          return;
+        }
+        
+        console.log('DELETE event processed with payload.old:', payload.old);
         
         // Type assertion for payload.old
         const deletedMessage = payload.old as {
@@ -475,52 +481,71 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
           reply_to: string | null;
         };
         
+        // Mark that we've received this delete event
+        console.log(`⚠️ DELETE EVENT RECEIVED for message ID: ${deletedMessage.id} ⚠️`);
+        
         const deletedMessageId = deletedMessage.id;
         
-        // If the deleted message is in our current message list, remove it
-        setMessages(prev => {
-          const updatedMessages = prev.filter(m => m.id !== deletedMessageId);
-          console.log(`Removed message ${deletedMessageId} from UI, remaining: ${updatedMessages.length}`);
-          return updatedMessages;
-        });
+        // Force a more direct approach to UI updates - first fetch current messages
+        // then filter them synchronously, and finally update state
+        const currentMessages = [...messages];
+        const updatedMessages = currentMessages.filter(m => m.id !== deletedMessageId);
+        console.log(`Filtering out message ${deletedMessageId}: before=${currentMessages.length}, after=${updatedMessages.length}`);
         
-        // If the deleted message is a reply to a message in our list,
-        // update the reply count of the parent message
-        if (deletedMessage.reply_to) {
-          console.log(`Message ${deletedMessageId} was a reply to ${deletedMessage.reply_to}, updating reply count`);
-          setMessages(prev => {
-            return prev.map(msg => {
-              if (msg.id === deletedMessage.reply_to) {
-                return {
-                  ...msg,
-                  reply_count: Math.max((msg.reply_count || 1) - 1, 0)
-                };
-              }
-              return msg;
-            });
-          });
-        }
-        
-        // If we're in thread view and the deleted message is in the thread, remove it
-        if (activeThreadMessage) {
-          if (deletedMessageId === activeThreadMessage.id) {
-            // If the thread parent was deleted, close the thread view
-            console.log('Thread parent was deleted, closing thread view');
+        // Create a separate task to ensure the state update happens outside this execution context
+        setTimeout(() => {
+          // Update state with a completely new array to force a re-render
+          setMessages([...updatedMessages]);
+          console.log(`Updated messages state after delete: ${updatedMessages.length} messages remaining`);
+          
+          // Handle thread view if needed
+          if (activeThreadMessage && activeThreadMessage.id === deletedMessageId) {
+            console.log(`Deleted message was the active thread, closing thread view`);
             setThreadView(false);
             setActiveThreadMessage(null);
             setThreadMessages([]);
-          } else if (deletedMessage.reply_to === activeThreadMessage.id) {
-            // If a thread reply was deleted, remove it from thread messages
-            console.log(`Thread reply ${deletedMessageId} was deleted, removing from thread UI`);
-            setThreadMessages(prev => prev.filter(m => m.id !== deletedMessageId));
           }
-        }
+          
+          // Handle reply count updates if needed
+          if (deletedMessage.reply_to) {
+            console.log(`Updating reply count for parent message ${deletedMessage.reply_to}`);
+            
+            // Find the parent message
+            const parentMessage = updatedMessages.find(m => m.id === deletedMessage.reply_to);
+            if (parentMessage) {
+              const updatedParentMessages = updatedMessages.map(msg => {
+                if (msg.id === deletedMessage.reply_to) {
+                  return {
+                    ...msg,
+                    reply_count: Math.max((msg.reply_count || 1) - 1, 0)
+                  };
+                }
+                return msg;
+              });
+              
+              // Update state again with the reply count changes
+              setMessages([...updatedParentMessages]);
+              console.log(`Updated parent message reply count for ${deletedMessage.reply_to}`);
+            }
+            
+            // Update thread messages if needed
+            if (activeThreadMessage && activeThreadMessage.id === deletedMessage.reply_to) {
+              const currentThreadMessages = [...threadMessages];
+              const updatedThreadMessages = currentThreadMessages.filter(m => m.id !== deletedMessageId);
+              setThreadMessages([...updatedThreadMessages]);
+              console.log(`Removed message ${deletedMessageId} from thread messages`);
+            }
+          }
+          
+          // Add a UI toast notification to make the deletion more visible
+          addToast(`Message was deleted`, 'success');
+        }, 50);
       }
     },
-    [currentChannel, activeThreadMessage]
+    [currentChannel, activeThreadMessage, messages, threadMessages]
   );
   
-  // Add subscription for thread DELETE events
+  // Add subscription for thread DELETE events when inside a thread
   useRealtimeSubscription<{
     id: string;
     content: string;
@@ -535,7 +560,10 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
       event: 'DELETE',
       filter: activeThreadMessage ? `reply_to=eq.${activeThreadMessage.id}` : undefined,
       callback: (payload) => {
-        if (!payload.old || !('id' in payload.old)) return;
+        if (!payload.old || !('id' in payload.old)) {
+          console.error('Thread DELETE event received but payload.old is missing or invalid:', payload);
+          return;
+        }
         
         console.log('Thread DELETE event received:', payload.old);
         
@@ -551,15 +579,41 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
         
         const deletedMessageId = deletedMessage.id;
         
-        // Remove the message from thread messages
-        setThreadMessages(prev => {
-          const updatedThreadMessages = prev.filter(m => m.id !== deletedMessageId);
-          console.log(`Removed message ${deletedMessageId} from thread UI, remaining: ${updatedThreadMessages.length}`);
-          return updatedThreadMessages;
-        });
+        // Get current thread messages and filter out the deleted one
+        const currentThreadMessages = [...threadMessages];
+        const updatedThreadMessages = currentThreadMessages.filter(m => m.id !== deletedMessageId);
+        console.log(`Filtering thread message ${deletedMessageId}: before=${currentThreadMessages.length}, after=${updatedThreadMessages.length}`);
+        
+        // Update thread messages state with the filtered array
+        setTimeout(() => {
+          // Update state with a completely new array to force a re-render
+          setThreadMessages([...updatedThreadMessages]);
+          console.log(`Updated thread messages state after delete: ${updatedThreadMessages.length} messages remaining`);
+          
+          // Update the reply count on the parent message if needed
+          if (activeThreadMessage) {
+            const currentMessages = [...messages];
+            const updatedParentMessages = currentMessages.map(msg => {
+              if (msg.id === activeThreadMessage.id) {
+                return {
+                  ...msg,
+                  reply_count: Math.max((msg.reply_count || 1) - 1, 0)
+                };
+              }
+              return msg;
+            });
+            
+            // Update messages state with the updated reply count
+            setMessages([...updatedParentMessages]);
+            console.log(`Updated parent message reply count for thread ${activeThreadMessage.id}`);
+          }
+          
+          // Add a subtle notification to make the deletion visible
+          addToast(`Thread reply was deleted`, 'success');
+        }, 50);
       }
     },
-    [activeThreadMessage]
+    [activeThreadMessage, messages, threadMessages]
   );
 
   // Handle opening a thread
@@ -1001,6 +1055,10 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
       
       // Then delete the message itself
       console.log(`Now deleting the message ${messageToDelete.id} itself`);
+      
+      // Log that we're about to call Supabase delete
+      console.log('About to call supabase.from("channel_messages").delete()');
+      
       const { error: deleteError } = await supabase
         .from('channel_messages')
         .delete()
@@ -1010,7 +1068,32 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
         console.error('Error deleting message:', deleteError);
         throw deleteError;
       } else {
-        console.log(`Successfully deleted message ${messageToDelete.id}`);
+        console.log(`Successfully deleted message ${messageToDelete.id} from database - realtime events should trigger now`);
+        
+        // Broadcast an additional DELETE event through a custom channel to ensure all clients update
+        // This is a fallback in case the realtime postgres events aren't working properly
+        const channel = supabase.channel(`manual-delete:${currentChannel}`);
+        channel.subscribe(async (status) => {
+          if (status === 'SUBSCRIBED') {
+            await channel.send({
+              type: 'broadcast',
+              event: 'manual_delete',
+              payload: { 
+                message_id: messageToDelete.id,
+                channel_id: messageToDelete.channel_id,
+                is_thread: isThreadMessage,
+                reply_to: messageToDelete.reply_to
+              }
+            });
+            
+            console.log('Sent manual delete broadcast');
+            
+            // Unsubscribe after sending
+            setTimeout(() => {
+              channel.unsubscribe();
+            }, 1000);
+          }
+        });
       }
       
       // Update UI based on whether it's a thread message or main message
@@ -1033,14 +1116,13 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
       // Show success toast with translation
       console.log('Delete operation completed successfully');
       addToast(t('common.success.messageDeleted'), 'success');
-      
     } catch (err) {
-      console.error('Error deleting message:', err);
+      console.error('Error in handleDeleteMessage:', err);
       addToast(t('common.errors.deleteFailed'), 'error');
     } finally {
       setIsDeleting(false);
-      setShowDeleteConfirmation(false);
       setMessageToDelete(null);
+      setShowDeleteConfirmation(false);
     }
   };
   
@@ -1050,6 +1132,73 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
     setIsThreadMessage(isThread);
     setShowDeleteConfirmation(true);
   };
+
+  // Set up listener for manual delete broadcasts
+  useEffect(() => {
+    if (!currentChannel) return;
+    
+    console.log(`Setting up manual delete listener for channel ${currentChannel}`);
+    
+    const channel = supabase.channel(`manual-delete:${currentChannel}`, {
+      config: {
+        broadcast: { self: false }
+      }
+    });
+    
+    channel
+      .on('broadcast', { event: 'manual_delete' }, (payload) => {
+        console.log('Received manual delete broadcast:', payload);
+        
+        const { message_id, is_thread, reply_to } = payload.payload;
+        
+        if (!message_id) {
+          console.error('Invalid manual delete payload:', payload);
+          return;
+        }
+        
+        console.log(`Manual delete for message ${message_id}, is_thread=${is_thread}, reply_to=${reply_to}`);
+        
+        // Force refresh the message list to ensure deleted messages don't appear
+        if (is_thread) {
+          // This is a thread message
+          setThreadMessages(prev => prev.filter(m => m.id !== message_id));
+        } else {
+          // This is a main channel message
+          setMessages(prev => prev.filter(m => m.id !== message_id));
+          
+          // If this was the active thread message, close the thread
+          if (activeThreadMessage && activeThreadMessage.id === message_id) {
+            setThreadView(false);
+            setActiveThreadMessage(null);
+            setThreadMessages([]);
+          }
+          
+          // If this was a reply, update reply counts
+          if (reply_to) {
+            setMessages(prev => 
+              prev.map(msg => {
+                if (msg.id === reply_to) {
+                  return {
+                    ...msg,
+                    reply_count: Math.max((msg.reply_count || 1) - 1, 0)
+                  };
+                }
+                return msg;
+              })
+            );
+          }
+        }
+        
+        // Add a toast to make the deletion visible
+        addToast('A message was deleted', 'success');
+      })
+      .subscribe();
+    
+    return () => {
+      console.log(`Cleaning up manual delete listener for channel ${currentChannel}`);
+      channel.unsubscribe();
+    };
+  }, [currentChannel, activeThreadMessage]);
 
   if (isLoading) {
     return (
@@ -1398,7 +1547,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
                         ) : (
                           <div className="w-6 flex-shrink-0" />
                         )}
-                        <div className="flex-1">
+                        <div>
                           {showHeader && (
                             <div className="flex items-baseline gap-2">
                               <span className="font-medium text-gray-900 dark:text-white text-sm">
