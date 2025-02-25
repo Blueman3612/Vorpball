@@ -49,6 +49,66 @@ interface ChatInterfaceProps {
   className?: string;
 }
 
+// Helper function to format message timestamps
+const formatMessageTime = (dateString: string) => {
+  const messageDate = new Date(dateString);
+  const today = new Date();
+  
+  // Get hours and minutes in 12-hour format without leading zeros
+  let hours = messageDate.getHours();
+  const minutes = messageDate.getMinutes();
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  
+  // Convert to 12-hour format
+  hours = hours % 12;
+  hours = hours ? hours : 12; // Convert 0 hour to 12
+  
+  const formattedMinutes = minutes < 10 ? `0${minutes}` : minutes;
+  const formattedTime = `${hours}:${formattedMinutes} ${ampm}`;
+  
+  // Check if the message is from today
+  const isToday = messageDate.toDateString() === today.toDateString();
+  
+  if (isToday) {
+    // For today's messages, just show hours and minutes
+    return formattedTime;
+  } else {
+    // For older messages, include the date
+    const formattedDate = messageDate.toLocaleDateString([], { 
+      month: 'short', 
+      day: 'numeric' 
+    });
+    
+    // Return both values for the component to handle
+    return `${formattedDate} ${formattedTime}`;
+  }
+};
+
+// Helper function to render the date part in bold
+const formatTimestampWithBoldDate = (dateString: string) => {
+  const formatted = formatMessageTime(dateString);
+  const today = new Date().toDateString();
+  const messageDate = new Date(dateString).toDateString();
+  
+  // If it's today's message, return as is
+  if (today === messageDate) {
+    return formatted;
+  }
+  
+  // For older messages, split the string and make the date bold
+  const parts = formatted.split(' ');
+  // The date part is the first two parts (e.g., "Jan 15")
+  const datePart = parts.slice(0, 2).join(' ');
+  // The time part is the last two parts (e.g., "2:30 PM")
+  const timePart = parts.slice(2).join(' ');
+  
+  return (
+    <>
+      <span className="font-medium">{datePart}</span> <span className="mx-0.5">·</span> {timePart}
+    </>
+  );
+};
+
 export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
   const { t } = useTranslations();
   const [channels, setChannels] = useState<Channel[]>([]);
@@ -814,7 +874,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
                               {message.user.username}
                             </span>
                             <span className="text-xs text-gray-500 dark:text-gray-400">
-                              {new Date(message.created_at).toLocaleTimeString()}
+                              {formatTimestampWithBoldDate(message.created_at)}
                             </span>
                           </div>
                         )}
@@ -963,7 +1023,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
                         {activeThreadMessage.user.username}
                       </span>
                       <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {new Date(activeThreadMessage.created_at).toLocaleTimeString()}
+                        {formatTimestampWithBoldDate(activeThreadMessage.created_at)}
                       </span>
                     </div>
                     <p className="text-gray-800 dark:text-gray-200">{activeThreadMessage.content}</p>
@@ -1021,7 +1081,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
                                 {message.user.username}
                               </span>
                               <span className="text-xs text-gray-500 dark:text-gray-400">
-                                {new Date(message.created_at).toLocaleTimeString()}
+                                {formatTimestampWithBoldDate(message.created_at)}
                               </span>
                             </div>
                           )}
@@ -1145,7 +1205,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
                           {activeThreadMessage.user.username}
                         </span>
                         <span className="text-xs text-gray-500 dark:text-gray-400">
-                          {new Date(activeThreadMessage.created_at).toLocaleTimeString()}
+                          {formatTimestampWithBoldDate(activeThreadMessage.created_at)}
                         </span>
                       </div>
                       <p className="text-gray-800 dark:text-gray-200">{activeThreadMessage.content}</p>
@@ -1203,7 +1263,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
                                   {message.user.username}
                                 </span>
                                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                                  {new Date(message.created_at).toLocaleTimeString()}
+                                  {formatTimestampWithBoldDate(message.created_at)}
                                 </span>
                               </div>
                             )}
