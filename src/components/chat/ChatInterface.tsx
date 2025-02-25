@@ -7,6 +7,7 @@ import { useTranslations } from '@/lib/i18n';
 import Image from 'next/image';
 import { addToast } from '@/components/ui/toast';
 import { ConfirmationModal } from '@/components/ui/modal';
+import { EmojiPicker } from '@/components/ui/emoji-picker';
 
 interface Channel {
   id: string;
@@ -1195,6 +1196,20 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  const handleEmojiSelect = (emoji: { native: string }) => {
+    setMessageInput(prev => prev + emoji.native);
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  };
+  
+  const handleThreadEmojiSelect = (emoji: { native: string }) => {
+    setThreadInput(prev => prev + emoji.native);
+    if (threadInputRef.current) {
+      threadInputRef.current.focus();
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -1426,10 +1441,14 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
                           'focus:outline-none focus:ring-2 focus:ring-primary-500/20',
                           'focus:border-primary-500/50',
                           'transition-colors duration-200',
-                          isSending && 'opacity-50 cursor-not-allowed'
+                          isSending && 'opacity-50 cursor-not-allowed',
+                          'pr-12'  // Add padding to the right for emoji picker
                         )}
                         disabled={isSending}
                       />
+                      <div className="absolute right-3 top-0.5 h-full flex items-center">
+                        <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+                      </div>
                     </div>
                   </form>
                 )}
@@ -1623,10 +1642,14 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
                         'focus:outline-none focus:ring-2 focus:ring-primary-500/20',
                         'focus:border-primary-500/50',
                         'transition-colors duration-200',
-                        isSendingThreadReply && 'opacity-50 cursor-not-allowed'
+                        isSendingThreadReply && 'opacity-50 cursor-not-allowed',
+                        'pr-12'  // Add padding to the right for emoji picker
                       )}
                       disabled={isSendingThreadReply}
                     />
+                    <div className="absolute right-3 top-0.5 h-full flex items-center">
+                      <EmojiPicker onEmojiSelect={handleThreadEmojiSelect} />
+                    </div>
                   </div>
                 </form>
               )}
@@ -1801,10 +1824,14 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
                           'focus:outline-none focus:ring-2 focus:ring-primary-500/20',
                           'focus:border-primary-500/50',
                           'transition-colors duration-200',
-                          isSendingThreadReply && 'opacity-50 cursor-not-allowed'
+                          isSendingThreadReply && 'opacity-50 cursor-not-allowed',
+                          'pr-12'  // Add padding to the right for emoji picker
                         )}
                         disabled={isSendingThreadReply}
                       />
+                      <div className="absolute right-3 top-0.5 h-full flex items-center">
+                        <EmojiPicker onEmojiSelect={handleThreadEmojiSelect} />
+                      </div>
                     </div>
                   </form>
                 )}
