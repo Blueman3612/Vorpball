@@ -28,6 +28,8 @@ interface Message {
     username: string;
     avatar_url: string | null;
   };
+  threadLeagueName?: string;
+  threadChannelName?: string;
 }
 
 interface TypingUser {
@@ -126,6 +128,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
   const [threadTypingUsers, setThreadTypingUsers] = useState<TypingUser[]>([]);
   const lastTypedRef = useRef<number>(0);
   const lastThreadTypedRef = useRef<number>(0);
+  const [leagueName, setLeagueName] = useState<string>("");
   
   // Thread-related state
   const [threadView, setThreadView] = useState<boolean>(false);
@@ -154,6 +157,26 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
   useEffect(() => {
     scrollThreadToBottom();
   }, [threadMessages]);
+
+  // Add effect to fetch league name
+  useEffect(() => {
+    async function fetchLeagueName() {
+      try {
+        const { data, error } = await supabase
+          .from('leagues')
+          .select('name')
+          .eq('id', leagueId)
+          .single();
+
+        if (error) throw error;
+        setLeagueName(data.name);
+      } catch (err) {
+        console.error('Error fetching league name:', err);
+      }
+    }
+
+    fetchLeagueName();
+  }, [leagueId]);
 
   // Add effect to fetch user role
   useEffect(() => {
@@ -395,6 +418,34 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
         .order('created_at', { ascending: true });
 
       if (repliesError) throw repliesError;
+
+      // Fetch channel information for the thread message
+      const { data: channelData, error: channelError } = await supabase
+        .from('league_channels')
+        .select('name, league_id')
+        .eq('id', message.channel_id)
+        .single();
+      
+      if (channelError) throw channelError;
+      
+      // Fetch league name if the channel is from a different league
+      if (channelData.league_id !== leagueId) {
+        const { data: threadLeagueData, error: threadLeagueError } = await supabase
+          .from('leagues')
+          .select('name')
+          .eq('id', channelData.league_id)
+          .single();
+          
+        if (!threadLeagueError && threadLeagueData) {
+          // Store thread-specific league name and channel name
+          message.threadLeagueName = threadLeagueData.name;
+          message.threadChannelName = channelData.name;
+        }
+      } else {
+        // Use current league name but store the correct channel name
+        message.threadLeagueName = leagueName;
+        message.threadChannelName = channelData.name;
+      }
 
       // Fetch user profiles for replies
       const userIds = [...new Set(repliesData?.map(msg => msg.user_id) || [])];
@@ -981,9 +1032,14 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
             {/* Thread header */}
             <div className="p-4 border-b border-gray-300/50 dark:border-gray-700/30">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {t('common.chat.thread')}
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    {activeThreadMessage?.threadLeagueName || leagueName}
+                  </h3>
+                  <span className="text-gray-600 dark:text-gray-400">
+                    • #{activeThreadMessage?.threadChannelName || channels.find(c => c.id === currentChannel)?.name}
+                  </span>
+                </div>
                 <button 
                   onClick={closeThread} 
                   className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -1163,9 +1219,14 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
               {/* Thread header */}
               <div className="p-4 border-b border-gray-300/50 dark:border-gray-700/30">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    {t('common.chat.thread')}
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      {activeThreadMessage?.threadLeagueName || leagueName}
+                    </h3>
+                    <span className="text-gray-600 dark:text-gray-400">
+                      • #{activeThreadMessage?.threadChannelName || channels.find(c => c.id === currentChannel)?.name}
+                    </span>
+                  </div>
                   <button 
                     onClick={closeThread} 
                     className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
