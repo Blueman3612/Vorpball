@@ -22,6 +22,7 @@ interface Message {
   user_id: string;
   channel_id: string;
   reply_to: string | null;
+  reply_count?: number;
   user: {
     id: string;
     username: string;
@@ -33,6 +34,7 @@ interface TypingUser {
   user_id: string;
   username: string;
   channel_id: string;
+  reply_to?: string | null;
   last_typed: string;
 }
 
@@ -61,7 +63,9 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
+  const [threadTypingUsers, setThreadTypingUsers] = useState<TypingUser[]>([]);
   const lastTypedRef = useRef<number>(0);
+  const lastThreadTypedRef = useRef<number>(0);
   
   // Thread-related state
   const [threadView, setThreadView] = useState<boolean>(false);
@@ -197,7 +201,10 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
         // First fetch messages
         const { data: messagesData, error: messagesError } = await supabase
           .from('channel_messages')
-          .select('*')
+          .select(`
+            *,
+            reply_count:channel_messages!reply_to(count)
+          `)
           .eq('channel_id', currentChannel)
           .is('reply_to', null) // Only fetch top-level messages (not replies)
           .order('created_at', { ascending: true })
@@ -205,8 +212,14 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
 
         if (messagesError) throw messagesError;
 
+        // Process the reply count from the Postgres aggregation
+        const processedMessages = messagesData?.map(msg => ({
+          ...msg,
+          reply_count: msg.reply_count?.[0]?.count || 0
+        }));
+
         // Then fetch profiles for these messages
-        const userIds = [...new Set(messagesData?.map(msg => msg.user_id) || [])];
+        const userIds = [...new Set(processedMessages?.map(msg => msg.user_id) || [])];
         const { data: profilesData, error: profilesError } = await supabase
           .from('profiles')
           .select('id, username, avatar_url')
@@ -218,13 +231,14 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
         const profilesMap = new Map(profilesData?.map(profile => [profile.id, profile]));
         
         // Transform the data to match our Message interface
-        const typedMessages = (messagesData || []).map(msg => ({
+        const typedMessages = (processedMessages || []).map(msg => ({
           id: msg.id,
           content: msg.content,
           created_at: msg.created_at,
           user_id: msg.user_id,
           channel_id: msg.channel_id,
           reply_to: msg.reply_to,
+          reply_count: msg.reply_count,
           user: profilesMap.get(msg.user_id)!
         })) as Message[];
         
@@ -348,6 +362,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
         user_id: msg.user_id,
         channel_id: msg.channel_id,
         reply_to: msg.reply_to,
+        reply_count: msg.reply_count,
         user: profilesMap.get(msg.user_id)!
       })) as Message[];
 
@@ -383,6 +398,35 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
         return;
       }
 
+      // Clear typing indicator for this user immediately
+      setThreadTypingUsers(prev => prev.filter(u => u.user_id !== user.id));
+
+      // Send stop typing broadcast for thread
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', user.id)
+          .single();
+
+        if (profile?.username) {
+          const channel = supabase.channel(`typing:${currentChannel}`);
+          await channel.send({
+            type: 'broadcast',
+            event: 'stop_typing',
+            payload: {
+              user_id: user.id,
+              username: profile.username,
+              channel_id: currentChannel,
+              reply_to: activeThreadMessage.id,
+              last_typed: new Date().toISOString()
+            }
+          });
+        }
+      } catch (err) {
+        console.error('Error sending stop typing broadcast for thread:', err);
+      }
+
       const { error: sendError } = await supabase
         .from('channel_messages')
         .insert({
@@ -394,7 +438,19 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
 
       if (sendError) throw sendError;
 
+      // Update the reply count in the UI without refetching everything
+      if (activeThreadMessage) {
+        setMessages(prevMessages => 
+          prevMessages.map(msg => 
+            msg.id === activeThreadMessage.id 
+              ? { ...msg, reply_count: (msg.reply_count || 0) + 1 }
+              : msg
+          )
+        );
+      }
+
       setThreadInput('');
+      lastThreadTypedRef.current = 0;
       threadInputRef.current?.focus();
     } catch (err) {
       console.error('Error sending thread reply:', err);
@@ -429,25 +485,47 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
         // Don't show typing indicator for current user
         if (currentUserId && payload.payload.user_id === currentUserId) return;
         
-        setTypingUsers(prev => {
-          const now = Date.now();
-          const filtered = prev.filter(user => 
-            user.user_id !== payload.payload.user_id && 
-            now - new Date(user.last_typed).getTime() < 3000
-          );
-          return [...filtered, payload.payload];
-        });
+        // Check if this is a thread typing event
+        if (payload.payload.reply_to) {
+          setThreadTypingUsers(prev => {
+            const now = Date.now();
+            const filtered = prev.filter(user => 
+              user.user_id !== payload.payload.user_id && 
+              now - new Date(user.last_typed).getTime() < 3000
+            );
+            return [...filtered, payload.payload];
+          });
+        } else {
+          setTypingUsers(prev => {
+            const now = Date.now();
+            const filtered = prev.filter(user => 
+              user.user_id !== payload.payload.user_id && 
+              now - new Date(user.last_typed).getTime() < 3000
+            );
+            return [...filtered, payload.payload];
+          });
+        }
       })
       .on('broadcast' as 'system', { event: 'stop_typing' }, (payload: BroadcastEvent) => {
         // Don't process stop typing for current user (handled in send message)
         if (currentUserId && payload.payload.user_id === currentUserId) return;
         
-        setTypingUsers(prev => prev.filter(user => user.user_id !== payload.payload.user_id));
+        if (payload.payload.reply_to) {
+          setThreadTypingUsers(prev => prev.filter(user => user.user_id !== payload.payload.user_id));
+        } else {
+          setTypingUsers(prev => prev.filter(user => user.user_id !== payload.payload.user_id));
+        }
       })
       .subscribe();
 
     const cleanupInterval = setInterval(() => {
       setTypingUsers(prev => {
+        const now = Date.now();
+        return prev.filter(user => 
+          now - new Date(user.last_typed).getTime() < 3000
+        );
+      });
+      setThreadTypingUsers(prev => {
         const now = Date.now();
         return prev.filter(user => 
           now - new Date(user.last_typed).getTime() < 3000
@@ -461,7 +539,45 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
     };
   }, [currentChannel]);
 
-  // Update the typing status function
+  // Update the typing status function for threads
+  const updateThreadTypingStatus = async () => {
+    const now = Date.now();
+    if (now - lastThreadTypedRef.current < 1000) return;
+    lastThreadTypedRef.current = now;
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || !currentChannel || !activeThreadMessage) return;
+
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', user.id)
+        .single();
+
+      if (!profile?.username) return;
+
+      // Get the channel instance
+      const channel = supabase.channel(`typing:${currentChannel}`);
+
+      // Broadcast typing status with thread info
+      await channel.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: {
+          user_id: user.id,
+          username: profile.username,
+          channel_id: currentChannel,
+          reply_to: activeThreadMessage.id,
+          last_typed: new Date().toISOString()
+        }
+      });
+    } catch (err) {
+      console.error('Error updating thread typing status:', err);
+    }
+  };
+
+  // Update the typing status function for the main chat
   const updateTypingStatus = async () => {
     const now = Date.now();
     if (now - lastTypedRef.current < 1000) return;
@@ -708,15 +824,25 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
                             !showHeader && "pt-0"
                           )}>{message.content}</p>
                           
-                          <button 
-                            onClick={() => openThread(message)}
-                            className="ml-2 mt-1 p-1 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 opacity-0 group-hover:opacity-100 transition-opacity"
-                            aria-label="Reply in thread"
-                          >
-                            <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M7.707 3.293a1 1 0 010 1.414L5.414 7H11a7 7 0 017 7v2a1 1 0 11-2 0v-2a5 5 0 00-5-5H5.414l2.293 2.293a1 1 0 11-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                          </button>
+                          <div className="flex items-center gap-2 ml-2">
+                            <button 
+                              onClick={() => openThread(message)}
+                              className={cn(
+                                "p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-opacity flex items-center gap-1",
+                                (message.reply_count ?? 0) > 0 
+                                  ? "bg-gray-100/70 dark:bg-gray-800/70 text-gray-700 dark:text-gray-300" 
+                                  : "text-gray-500 dark:text-gray-400 opacity-0 group-hover:opacity-100"
+                              )}
+                              aria-label="Reply in thread"
+                            >
+                              <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M7.707 3.293a1 1 0 010 1.414L5.414 7H11a7 7 0 017 7v2a1 1 0 11-2 0v-2a5 5 0 00-5-5H5.414l2.293 2.293a1 1 0 11-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                              {(message.reply_count ?? 0) > 0 && (
+                                <span className="text-xs font-medium">{message.reply_count}</span>
+                              )}
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -914,6 +1040,25 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
 
             {/* Thread input */}
             <div className="p-4 border-t border-gray-300/50 dark:border-gray-700/30">
+              {threadTypingUsers.length > 0 && (
+                <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-2">
+                  <div className="flex gap-1">
+                    <span className="animate-bounce">•</span>
+                    <span className="animate-bounce [animation-delay:0.2s]">•</span>
+                    <span className="animate-bounce [animation-delay:0.4s]">•</span>
+                  </div>
+                  <span>
+                    {threadTypingUsers.length === 1 
+                      ? t('common.chat.typingIndicator.single', { username: threadTypingUsers[0].username })
+                      : threadTypingUsers.length === 2
+                      ? t('common.chat.typingIndicator.double', { 
+                          username1: threadTypingUsers[0].username,
+                          username2: threadTypingUsers[1].username 
+                        })
+                      : t('common.chat.typingIndicator.multiple', { count: threadTypingUsers.length })}
+                  </span>
+                </div>
+              )}
               {!canPost ? (
                 <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-2">
                   {t('common.errors.noPostPermission')}
@@ -926,7 +1071,10 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
                       type="text"
                       placeholder={t('common.actions.replyInThread')}
                       value={threadInput}
-                      onChange={(e) => setThreadInput(e.target.value)}
+                      onChange={(e) => {
+                        setThreadInput(e.target.value);
+                        updateThreadTypingStatus();
+                      }}
                       className={cn(
                         'w-full px-4 py-2 rounded-md',
                         'bg-gray-100/50 dark:bg-gray-800/50',
