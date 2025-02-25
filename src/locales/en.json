@@ -15,6 +15,7 @@
       "reset": "Reset",
       "inviteMember": "Invite Member",
       "sendMessage": "Send a message...",
+      "replyInThread": "Reply in thread...",
       "addTeamToTrade": "Add Team to Trade",
       "addPlayer": "Add Player",
       "proposeTrade": "Propose Trade"
@@ -86,6 +87,8 @@
     "chat": {
       "channels": "Channels",
       "noMessages": "No messages yet",
+      "thread": "Thread",
+      "noReplies": "No replies yet",
       "typingIndicator": {
         "single": "{username} is typing...",
         "double": "{username1} and {username2} are typing...",

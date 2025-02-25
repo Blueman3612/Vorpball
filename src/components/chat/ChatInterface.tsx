@@ -21,6 +21,7 @@ interface Message {
   created_at: string;
   user_id: string;
   channel_id: string;
+  reply_to: string | null;
   user: {
     id: string;
     username: string;
@@ -61,15 +62,34 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
   const lastTypedRef = useRef<number>(0);
+  
+  // Thread-related state
+  const [threadView, setThreadView] = useState<boolean>(false);
+  const [activeThreadMessage, setActiveThreadMessage] = useState<Message | null>(null);
+  const [threadMessages, setThreadMessages] = useState<Message[]>([]);
+  const [threadInput, setThreadInput] = useState('');
+  const [isLoadingThread, setIsLoadingThread] = useState(false);
+  const [isSendingThreadReply, setIsSendingThreadReply] = useState(false);
+  const threadMessagesEndRef = useRef<HTMLDivElement>(null);
+  const threadInputRef = useRef<HTMLInputElement>(null);
 
   // Scroll to bottom of messages
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // Scroll to bottom of thread messages
+  const scrollThreadToBottom = () => {
+    threadMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    scrollThreadToBottom();
+  }, [threadMessages]);
 
   // Add effect to fetch user role
   useEffect(() => {
@@ -179,6 +199,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
           .from('channel_messages')
           .select('*')
           .eq('channel_id', currentChannel)
+          .is('reply_to', null) // Only fetch top-level messages (not replies)
           .order('created_at', { ascending: true })
           .limit(50);
 
@@ -203,6 +224,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
           created_at: msg.created_at,
           user_id: msg.user_id,
           channel_id: msg.channel_id,
+          reply_to: msg.reply_to,
           user: profilesMap.get(msg.user_id)!
         })) as Message[];
         
@@ -222,6 +244,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
     created_at: string;
     user_id: string;
     channel_id: string;
+    reply_to: string | null;
   }>(
     {
       channel: `channel:${currentChannel}`,
@@ -231,6 +254,33 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
       callback: async (payload) => {
         if (!payload.new || !('user_id' in payload.new)) return;
         const newMessage = payload.new;
+
+        // Only add to messages if it's a top-level message
+        if (newMessage.reply_to) {
+          // If we're viewing this thread, add the reply to the thread
+          if (activeThreadMessage && activeThreadMessage.id === newMessage.reply_to) {
+            // Fetch the user profile
+            const { data: profileData, error: profileError } = await supabase
+              .from('profiles')
+              .select('id, username, avatar_url')
+              .eq('id', newMessage.user_id)
+              .single();
+
+            if (profileError) {
+              console.error('Error fetching profile:', profileError);
+              return;
+            }
+
+            // Transform the data to match our Message interface
+            const typedMessage = {
+              ...newMessage,
+              user: profileData
+            } as Message;
+
+            setThreadMessages(prev => [...prev, typedMessage]);
+          }
+          return;
+        }
         
         // Fetch the user profile
         const { data: profileData, error: profileError } = await supabase
@@ -253,8 +303,105 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
         setMessages(prev => [...prev, typedMessage]);
       }
     },
-    [currentChannel]
+    [currentChannel, activeThreadMessage]
   );
+
+  // Handle opening a thread
+  const openThread = async (message: Message) => {
+    setIsLoadingThread(true);
+    setActiveThreadMessage(message);
+    setThreadView(true);
+
+    try {
+      // Fetch thread replies
+      const { data: repliesData, error: repliesError } = await supabase
+        .from('channel_messages')
+        .select('*')
+        .eq('reply_to', message.id)
+        .order('created_at', { ascending: true });
+
+      if (repliesError) throw repliesError;
+
+      // Fetch user profiles for replies
+      const userIds = [...new Set(repliesData?.map(msg => msg.user_id) || [])];
+      if (userIds.length === 0) {
+        setThreadMessages([]);
+        setIsLoadingThread(false);
+        return;
+      }
+
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, username, avatar_url')
+        .in('id', userIds);
+
+      if (profilesError) throw profilesError;
+
+      // Create profile lookup map
+      const profilesMap = new Map(profilesData?.map(profile => [profile.id, profile]));
+
+      // Transform to typed messages
+      const typedReplies = (repliesData || []).map(msg => ({
+        id: msg.id,
+        content: msg.content,
+        created_at: msg.created_at,
+        user_id: msg.user_id,
+        channel_id: msg.channel_id,
+        reply_to: msg.reply_to,
+        user: profilesMap.get(msg.user_id)!
+      })) as Message[];
+
+      setThreadMessages(typedReplies);
+    } catch (err) {
+      console.error('Error fetching thread replies:', err);
+    } finally {
+      setIsLoadingThread(false);
+    }
+  };
+
+  // Close thread view
+  const closeThread = () => {
+    setThreadView(false);
+    setActiveThreadMessage(null);
+    setThreadMessages([]);
+    setThreadInput('');
+  };
+
+  // Send a reply in a thread
+  const handleSendThreadReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!threadInput.trim() || !activeThreadMessage || isSendingThreadReply) return;
+
+    try {
+      setIsSendingThreadReply(true);
+      
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      if (!user) {
+        setError('You must be logged in to send messages.');
+        return;
+      }
+
+      const { error: sendError } = await supabase
+        .from('channel_messages')
+        .insert({
+          content: threadInput.trim(),
+          channel_id: activeThreadMessage.channel_id,
+          user_id: user.id,
+          reply_to: activeThreadMessage.id
+        });
+
+      if (sendError) throw sendError;
+
+      setThreadInput('');
+      threadInputRef.current?.focus();
+    } catch (err) {
+      console.error('Error sending thread reply:', err);
+    } finally {
+      setIsSendingThreadReply(false);
+    }
+  };
 
   // Update the typing events subscription
   useEffect(() => {
@@ -402,7 +549,8 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
         .insert({
           content: messageInput.trim(),
           channel_id: currentChannel,
-          user_id: user.id
+          user_id: user.id,
+          reply_to: null // Explicitly set to null for top-level messages
         });
 
       if (sendError) throw sendError;
@@ -487,7 +635,10 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
         </div>
 
         {/* Messages Area */}
-        <div className="flex-1 flex flex-col">
+        <div className={cn(
+          "flex-1 flex flex-col",
+          threadView && "md:w-[60%]"
+        )}>
           {/* Channel Header */}
           {currentChannel && (
             <div className="p-4 border-b border-gray-300/50 dark:border-gray-700/30">
@@ -518,7 +669,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
                     new Date(message.created_at).getTime() - new Date(previousMessage.created_at).getTime() > 60000;
 
                   return (
-                    <div key={message.id} className="flex gap-3">
+                    <div key={message.id} className="flex gap-3 group">
                       {showHeader ? (
                         <div className="flex-shrink-0 relative top-2">
                           <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
@@ -540,7 +691,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
                       ) : (
                         <div className="w-8 flex-shrink-0" />
                       )}
-                      <div>
+                      <div className="flex-1">
                         {showHeader && (
                           <div className="flex items-baseline gap-2">
                             <span className="font-medium text-gray-900 dark:text-white">
@@ -551,10 +702,22 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
                             </span>
                           </div>
                         )}
-                        <p className={cn(
-                          "text-gray-800 dark:text-gray-200",
-                          !showHeader && "pt-0"
-                        )}>{message.content}</p>
+                        <div className="flex items-start">
+                          <p className={cn(
+                            "text-gray-800 dark:text-gray-200",
+                            !showHeader && "pt-0"
+                          )}>{message.content}</p>
+                          
+                          <button 
+                            onClick={() => openThread(message)}
+                            className="ml-2 mt-1 p-1 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 opacity-0 group-hover:opacity-100 transition-opacity"
+                            aria-label="Reply in thread"
+                          >
+                            <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M7.707 3.293a1 1 0 010 1.414L5.414 7H11a7 7 0 017 7v2a1 1 0 11-2 0v-2a5 5 0 00-5-5H5.414l2.293 2.293a1 1 0 11-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -625,6 +788,325 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
             )}
           </div>
         </div>
+
+        {/* Thread panel */}
+        {threadView && (
+          <div className="hidden md:flex flex-col w-[40%] border-l border-gray-300/50 dark:border-gray-700/30">
+            {/* Thread header */}
+            <div className="p-4 border-b border-gray-300/50 dark:border-gray-700/30">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {t('common.chat.thread')}
+                </h3>
+                <button 
+                  onClick={closeThread} 
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  aria-label="Close thread"
+                >
+                  <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Original message */}
+            {activeThreadMessage && (
+              <div className="p-4 border-b border-gray-300/50 dark:border-gray-700/30">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                      {activeThreadMessage.user.avatar_url ? (
+                        <Image
+                          src={activeThreadMessage.user.avatar_url}
+                          alt={activeThreadMessage.user.username}
+                          width={32}
+                          height={32}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
+                          {activeThreadMessage.user.username.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {activeThreadMessage.user.username}
+                      </span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        {new Date(activeThreadMessage.created_at).toLocaleTimeString()}
+                      </span>
+                    </div>
+                    <p className="text-gray-800 dark:text-gray-200">{activeThreadMessage.content}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Thread replies */}
+            <CustomScrollArea className="flex-1 p-4">
+              {isLoadingThread ? (
+                <div className="flex justify-center py-4">
+                  <div className="w-8 h-8 border-3 border-gray-300 border-t-primary-600 rounded-full animate-spin" />
+                </div>
+              ) : threadMessages.length === 0 ? (
+                <div className="text-sm text-gray-600 dark:text-gray-400 text-center py-4">
+                  {t('common.chat.noReplies')}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {threadMessages.map((message, index) => {
+                    const previousMessage = index > 0 ? threadMessages[index - 1] : null;
+                    const showHeader = 
+                      !previousMessage || 
+                      previousMessage.user_id !== message.user_id ||
+                      new Date(message.created_at).getTime() - new Date(previousMessage.created_at).getTime() > 60000;
+
+                    return (
+                      <div key={message.id} className="flex gap-3">
+                        {showHeader ? (
+                          <div className="flex-shrink-0 relative top-1">
+                            <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                              {message.user.avatar_url ? (
+                                <Image
+                                  src={message.user.avatar_url}
+                                  alt={message.user.username}
+                                  width={24}
+                                  height={24}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400 text-xs">
+                                  {message.user.username.charAt(0).toUpperCase()}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="w-6 flex-shrink-0" />
+                        )}
+                        <div>
+                          {showHeader && (
+                            <div className="flex items-baseline gap-2">
+                              <span className="font-medium text-gray-900 dark:text-white text-sm">
+                                {message.user.username}
+                              </span>
+                              <span className="text-xs text-gray-500 dark:text-gray-400">
+                                {new Date(message.created_at).toLocaleTimeString()}
+                              </span>
+                            </div>
+                          )}
+                          <p className={cn(
+                            "text-gray-800 dark:text-gray-200 text-sm",
+                            !showHeader && "pt-0"
+                          )}>{message.content}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div ref={threadMessagesEndRef} />
+                </div>
+              )}
+            </CustomScrollArea>
+
+            {/* Thread input */}
+            <div className="p-4 border-t border-gray-300/50 dark:border-gray-700/30">
+              {!canPost ? (
+                <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-2">
+                  {t('common.errors.noPostPermission')}
+                </div>
+              ) : (
+                <form onSubmit={handleSendThreadReply}>
+                  <div className="relative">
+                    <input
+                      ref={threadInputRef}
+                      type="text"
+                      placeholder={t('common.actions.replyInThread')}
+                      value={threadInput}
+                      onChange={(e) => setThreadInput(e.target.value)}
+                      className={cn(
+                        'w-full px-4 py-2 rounded-md',
+                        'bg-gray-100/50 dark:bg-gray-800/50',
+                        'border border-gray-300/50 dark:border-gray-600/30',
+                        'hover:border-gray-400/50 dark:hover:border-gray-500/50',
+                        'text-gray-900 dark:text-white',
+                        'placeholder-gray-500 dark:placeholder-gray-400',
+                        'focus:outline-none focus:ring-2 focus:ring-primary-500/20',
+                        'focus:border-primary-500/50',
+                        'transition-colors duration-200',
+                        isSendingThreadReply && 'opacity-50 cursor-not-allowed'
+                      )}
+                      disabled={isSendingThreadReply}
+                    />
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Mobile thread view (dialog/modal for small screens) */}
+        {threadView && (
+          <div className="md:hidden fixed inset-0 z-50 bg-black/50 dark:bg-black/70 flex items-center justify-center p-4">
+            <div className="w-full max-w-lg bg-white dark:bg-gray-900 rounded-lg shadow-lg flex flex-col max-h-[90vh]">
+              {/* Thread header */}
+              <div className="p-4 border-b border-gray-300/50 dark:border-gray-700/30">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    {t('common.chat.thread')}
+                  </h3>
+                  <button 
+                    onClick={closeThread} 
+                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                    aria-label="Close thread"
+                  >
+                    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Original message */}
+              {activeThreadMessage && (
+                <div className="p-4 border-b border-gray-300/50 dark:border-gray-700/30">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0">
+                      <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                        {activeThreadMessage.user.avatar_url ? (
+                          <Image
+                            src={activeThreadMessage.user.avatar_url}
+                            alt={activeThreadMessage.user.username}
+                            width={32}
+                            height={32}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
+                            {activeThreadMessage.user.username.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex items-baseline gap-2">
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {activeThreadMessage.user.username}
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {new Date(activeThreadMessage.created_at).toLocaleTimeString()}
+                        </span>
+                      </div>
+                      <p className="text-gray-800 dark:text-gray-200">{activeThreadMessage.content}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Thread replies */}
+              <CustomScrollArea className="flex-1 p-4">
+                {isLoadingThread ? (
+                  <div className="flex justify-center py-4">
+                    <div className="w-8 h-8 border-3 border-gray-300 border-t-primary-600 rounded-full animate-spin" />
+                  </div>
+                ) : threadMessages.length === 0 ? (
+                  <div className="text-sm text-gray-600 dark:text-gray-400 text-center py-4">
+                    {t('common.chat.noReplies')}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {threadMessages.map((message, index) => {
+                      const previousMessage = index > 0 ? threadMessages[index - 1] : null;
+                      const showHeader = 
+                        !previousMessage || 
+                        previousMessage.user_id !== message.user_id ||
+                        new Date(message.created_at).getTime() - new Date(previousMessage.created_at).getTime() > 60000;
+
+                      return (
+                        <div key={message.id} className="flex gap-3">
+                          {showHeader ? (
+                            <div className="flex-shrink-0 relative top-1">
+                              <div className="w-6 h-6 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                                {message.user.avatar_url ? (
+                                  <Image
+                                    src={message.user.avatar_url}
+                                    alt={message.user.username}
+                                    width={24}
+                                    height={24}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400 text-xs">
+                                    {message.user.username.charAt(0).toUpperCase()}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="w-6 flex-shrink-0" />
+                          )}
+                          <div>
+                            {showHeader && (
+                              <div className="flex items-baseline gap-2">
+                                <span className="font-medium text-gray-900 dark:text-white text-sm">
+                                  {message.user.username}
+                                </span>
+                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                  {new Date(message.created_at).toLocaleTimeString()}
+                                </span>
+                              </div>
+                            )}
+                            <p className={cn(
+                              "text-gray-800 dark:text-gray-200 text-sm",
+                              !showHeader && "pt-0"
+                            )}>{message.content}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div ref={threadMessagesEndRef} />
+                  </div>
+                )}
+              </CustomScrollArea>
+
+              {/* Thread input */}
+              <div className="p-4 border-t border-gray-300/50 dark:border-gray-700/30">
+                {!canPost ? (
+                  <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-2">
+                    {t('common.errors.noPostPermission')}
+                  </div>
+                ) : (
+                  <form onSubmit={handleSendThreadReply}>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder={t('common.actions.replyInThread')}
+                        value={threadInput}
+                        onChange={(e) => setThreadInput(e.target.value)}
+                        className={cn(
+                          'w-full px-4 py-2 rounded-md',
+                          'bg-gray-100/50 dark:bg-gray-800/50',
+                          'border border-gray-300/50 dark:border-gray-600/30',
+                          'hover:border-gray-400/50 dark:hover:border-gray-500/50',
+                          'text-gray-900 dark:text-white',
+                          'placeholder-gray-500 dark:placeholder-gray-400',
+                          'focus:outline-none focus:ring-2 focus:ring-primary-500/20',
+                          'focus:border-primary-500/50',
+                          'transition-colors duration-200',
+                          isSendingThreadReply && 'opacity-50 cursor-not-allowed'
+                        )}
+                        disabled={isSendingThreadReply}
+                      />
+                    </div>
+                  </form>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
