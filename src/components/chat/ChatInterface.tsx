@@ -149,6 +149,8 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [isThreadMessage, setIsThreadMessage] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  // Add a flag to track if messages update is from a thread reply
+  const isThreadReplyUpdate = useRef(false);
 
   // Scroll to bottom of messages
   const scrollToBottom = () => {
@@ -179,8 +181,20 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
   };
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    // Only scroll to bottom when not in thread view and not updating from a thread reply
+    if (!threadView && !isThreadReplyUpdate.current) {
+      console.log(`[DEBUG] Auto-scrolling main chat (messages changed, threadView=${threadView}, isThreadReply=${isThreadReplyUpdate.current})`);
+      scrollToBottom();
+    } else {
+      console.log(`[DEBUG] Preventing main chat auto-scroll while in thread view or thread reply update`);
+      // Reset the flag after this render cycle
+      if (isThreadReplyUpdate.current) {
+        setTimeout(() => {
+          isThreadReplyUpdate.current = false;
+        }, 0);
+      }
+    }
+  }, [messages, threadView]);
 
   useEffect(() => {
     // Only scroll if there are messages in the thread
@@ -450,6 +464,10 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
           
           // Update reply count on the parent message in our local state
           console.log(`Updating reply count for message ${newMessage.reply_to}`);
+          
+          // Set the flag to prevent auto-scrolling for thread reply updates
+          isThreadReplyUpdate.current = true;
+          
           setMessages(prev => {
             const updated = prev.map(msg => {
               if (msg.id === newMessage.reply_to) {
@@ -465,6 +483,12 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
             
             return updated;
           });
+          
+          // IMPORTANT: Do NOT trigger scrollToBottom for thread replies
+          // The main issue was here - thread replies were triggering the useEffect for messages
+          // which was causing the main chat to scroll. We need to prevent this scroll event.
+          console.log(`[DEBUG] Thread reply received - preventing main chat scroll`);
+          return; // Early return to prevent any scrolling of main chat
         } else {
           // This is a new top-level message
           console.log(`Message ${newMessage.id} is a top-level message`);
@@ -491,10 +515,10 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
           // Add the new message to our local state
           setMessages(prev => [...prev, typedMessage]);
           
-          // If we have new messages and not in a thread view, scroll main chat to bottom
-          // Only scroll the main chat if we're not focused on a thread
+          // Only scroll the main chat if this is a top-level message
+          // and we're not focused on a thread
           if (!threadView && messagesEndRef.current) {
-            console.log(`[DEBUG] Scrolling main chat to bottom (threadView=${threadView})`);
+            console.log(`[DEBUG] Scrolling main chat to bottom for new top-level message (threadView=${threadView})`);
             scrollToBottom();
           } else {
             console.log(`[DEBUG] Not scrolling main chat because threadView=${threadView}`);
@@ -666,6 +690,9 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
               }
               return msg;
             });
+            
+            // Set the flag to prevent auto-scrolling for thread reply updates
+            isThreadReplyUpdate.current = true;
             
             // Update messages state with the updated reply count
             setMessages([...updatedParentMessages]);
@@ -1228,6 +1255,9 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
           
           // If this was a reply, update reply counts
           if (reply_to) {
+            // Set the flag to prevent auto-scrolling for thread reply updates
+            isThreadReplyUpdate.current = true;
+            
             setMessages(prev => 
               prev.map(msg => {
                 if (msg.id === reply_to) {
