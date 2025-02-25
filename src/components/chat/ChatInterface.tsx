@@ -140,6 +140,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
   const [isLoadingThread, setIsLoadingThread] = useState(false);
   const [isSendingThreadReply, setIsSendingThreadReply] = useState(false);
   const threadMessagesEndRef = useRef<HTMLDivElement>(null);
+  const mobileThreadMessagesEndRef = useRef<HTMLDivElement>(null); // Add separate ref for mobile view
   const threadInputRef = useRef<HTMLInputElement>(null);
   
   // Message deletion state
@@ -155,8 +156,26 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
   };
 
   // Scroll to bottom of thread messages
-  const scrollThreadToBottom = () => {
-    threadMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const scrollThreadToBottom = (forceScroll = false) => {
+    console.log(`[DEBUG] scrollThreadToBottom called with forceScroll=${forceScroll}`);
+    
+    // Use matchMedia to check if we're in mobile view
+    const isMobile = window.matchMedia('(max-width: 767px)').matches;
+    console.log(`[DEBUG] Current view is ${isMobile ? 'mobile' : 'desktop'}`);
+    
+    // Use the appropriate ref based on the current view
+    const refToUse = isMobile ? mobileThreadMessagesEndRef : threadMessagesEndRef;
+    console.log(`[DEBUG] Using ${isMobile ? 'mobile' : 'desktop'} thread ref, exists? ${!!refToUse.current}`);
+    
+    if (refToUse.current) {
+      console.log(`[DEBUG] Attempting to scroll thread to bottom (${isMobile ? 'mobile' : 'desktop'} view)`);
+      refToUse.current.scrollIntoView({ 
+        behavior: forceScroll ? 'auto' : 'smooth'
+      });
+      console.log(`[DEBUG] Thread scroll executed with behavior: ${forceScroll ? 'auto' : 'smooth'}`);
+    } else {
+      console.log(`[DEBUG] ❌ Thread scroll failed - ref not available for ${isMobile ? 'mobile' : 'desktop'} view`);
+    }
   };
 
   useEffect(() => {
@@ -164,8 +183,29 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
   }, [messages]);
 
   useEffect(() => {
-    scrollThreadToBottom();
+    // Only scroll if there are messages in the thread
+    if (threadMessages.length > 0) {
+      console.log(`[DEBUG] useEffect for threadMessages triggered. Messages count: ${threadMessages.length}`);
+      // Add a small delay to ensure the DOM has updated
+      setTimeout(() => {
+        console.log(`[DEBUG] Executing delayed thread scroll in threadMessages useEffect`);
+        scrollThreadToBottom();
+      }, 50);
+    } else {
+      console.log(`[DEBUG] No thread messages to scroll to (count: ${threadMessages.length})`);
+    }
   }, [threadMessages]);
+
+  // Add a new effect to scroll when thread view is opened
+  useEffect(() => {
+    console.log(`[DEBUG] Thread view state changed: threadView=${threadView}, isLoadingThread=${isLoadingThread}, threadMessages.length=${threadMessages.length}`);
+    
+    if (threadView && !isLoadingThread && threadMessages.length > 0) {
+      console.log(`[DEBUG] Thread view opened and ready to scroll`);
+      // Use forceScroll=true to make it immediate on thread open
+      scrollThreadToBottom(true);
+    }
+  }, [threadView, isLoadingThread, threadMessages.length]);
 
   // Add effect to fetch league name
   useEffect(() => {
@@ -375,7 +415,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
           
           // If we're viewing this thread, add the reply to the thread
           if (activeThreadMessage && activeThreadMessage.id === newMessage.reply_to) {
-            console.log(`Adding reply to currently open thread ${activeThreadMessage.id}`);
+            console.log(`[DEBUG] 📨 New reply received for current thread: ${activeThreadMessage.id}`);
             
             // Fetch the user profile
             const { data: profileData, error: profileError } = await supabase
@@ -395,7 +435,17 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
               user: profileData
             } as Message;
 
+            console.log(`[DEBUG] Adding new message to thread messages`);
             setThreadMessages(prev => [...prev, typedMessage]);
+            
+            // Add this to trigger thread scroll when new messages come in via real-time
+            // Small timeout to ensure state is updated before scrolling
+            setTimeout(() => {
+              console.log(`[DEBUG] Real-time thread update - triggering thread scroll`);
+              scrollThreadToBottom();
+            }, 50);
+          } else {
+            console.log(`[DEBUG] Reply received but not for current thread (current=${activeThreadMessage?.id}, reply_to=${newMessage.reply_to})`);
           }
           
           // Update reply count on the parent message in our local state
@@ -441,9 +491,13 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
           // Add the new message to our local state
           setMessages(prev => [...prev, typedMessage]);
           
-          // If we have new messages and the chat is scrolled near the bottom, scroll to bottom
-          if (messagesEndRef.current) {
+          // If we have new messages and not in a thread view, scroll main chat to bottom
+          // Only scroll the main chat if we're not focused on a thread
+          if (!threadView && messagesEndRef.current) {
+            console.log(`[DEBUG] Scrolling main chat to bottom (threadView=${threadView})`);
             scrollToBottom();
+          } else {
+            console.log(`[DEBUG] Not scrolling main chat because threadView=${threadView}`);
           }
         }
       }
@@ -595,6 +649,11 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
           setThreadMessages([...updatedThreadMessages]);
           console.log(`Updated thread messages state after delete: ${updatedThreadMessages.length} messages remaining`);
           
+          // Add scroll trigger after deletion to maintain proper scroll position
+          if (updatedThreadMessages.length > 0) {
+            setTimeout(() => scrollThreadToBottom(), 50);
+          }
+          
           // Update the reply count on the parent message if needed
           if (activeThreadMessage) {
             const currentMessages = [...messages];
@@ -623,6 +682,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
 
   // Handle opening a thread
   const openThread = async (message: Message) => {
+    console.log(`[DEBUG] openThread called for message ID: ${message.id}`);
     setIsLoadingThread(true);
     setActiveThreadMessage(message);
     setThreadView(true);
@@ -637,42 +697,10 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
 
       if (repliesError) throw repliesError;
 
-      // Fetch channel information for the thread message
-      const { data: channelData, error: channelError } = await supabase
-        .from('league_channels')
-        .select('name, league_id')
-        .eq('id', message.channel_id)
-        .single();
-      
-      if (channelError) throw channelError;
-      
-      // Fetch league name if the channel is from a different league
-      if (channelData.league_id !== leagueId) {
-        const { data: threadLeagueData, error: threadLeagueError } = await supabase
-          .from('leagues')
-          .select('name')
-          .eq('id', channelData.league_id)
-          .single();
-          
-        if (!threadLeagueError && threadLeagueData) {
-          // Store thread-specific league name and channel name
-          message.threadLeagueName = threadLeagueData.name;
-          message.threadChannelName = channelData.name;
-        }
-      } else {
-        // Use current league name but store the correct channel name
-        message.threadLeagueName = leagueName;
-        message.threadChannelName = channelData.name;
-      }
+      console.log(`[DEBUG] Fetched ${repliesData?.length || 0} thread replies`);
 
-      // Fetch user profiles for replies
+      // Get user profiles for these replies
       const userIds = [...new Set(repliesData?.map(msg => msg.user_id) || [])];
-      if (userIds.length === 0) {
-        setThreadMessages([]);
-        setIsLoadingThread(false);
-        return;
-      }
-
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select('id, username, avatar_url')
@@ -680,7 +708,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
 
       if (profilesError) throw profilesError;
 
-      // Create profile lookup map
+      // Create a map of profiles by id for easy lookup
       const profilesMap = new Map(profilesData?.map(profile => [profile.id, profile]));
 
       // Transform to typed messages
@@ -695,10 +723,14 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
         user: profilesMap.get(msg.user_id)!
       })) as Message[];
 
+      console.log(`[DEBUG] Setting ${typedReplies.length} thread messages`);
       setThreadMessages(typedReplies);
+      
+      // Remove the setTimeout since we now handle scrolling in the useEffect
     } catch (err) {
       console.error('Error fetching thread replies:', err);
     } finally {
+      console.log(`[DEBUG] Thread loading complete`);
       setIsLoadingThread(false);
     }
   };
@@ -715,9 +747,15 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
   const handleSendThreadReply = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!threadInput.trim() || !activeThreadMessage || isSendingThreadReply) return;
+    console.log(`[DEBUG] handleSendThreadReply called`);
+    
+    if (!threadInput.trim() || !activeThreadMessage || isSendingThreadReply) {
+      console.log(`[DEBUG] ❌ Thread reply cancelled - empty input or missing thread: ${!threadInput.trim() ? 'empty input' : !activeThreadMessage ? 'no active thread' : 'already sending'}`);
+      return;
+    }
 
     try {
+      console.log(`[DEBUG] Sending thread reply to message ID: ${activeThreadMessage.id}`);
       setIsSendingThreadReply(true);
       
       const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -756,6 +794,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
         console.error('Error sending stop typing broadcast for thread:', err);
       }
 
+      console.log(`[DEBUG] Inserting thread reply to database`);
       const { error: sendError } = await supabase
         .from('channel_messages')
         .insert({
@@ -766,13 +805,22 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
         });
 
       if (sendError) throw sendError;
-
+      
+      console.log(`[DEBUG] Thread reply sent successfully`);
+      
       // We're removing the local reply count update and relying solely on the real-time subscription
       // to update the reply count. This prevents the double-counting issue.
       
       setThreadInput('');
       lastThreadTypedRef.current = 0;
       threadInputRef.current?.focus();
+      
+      // Add explicit scroll to bottom after sending a thread reply
+      // This ensures immediate feedback while waiting for the realtime update
+      setTimeout(() => {
+        console.log(`[DEBUG] Executing post-send thread scroll`);
+        scrollThreadToBottom();
+      }, 50);
     } catch (err) {
       console.error('Error sending thread reply:', err);
     } finally {
@@ -1205,6 +1253,20 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
     };
   }, [currentChannel, activeThreadMessage]);
 
+  // Add debug information about the viewport
+  useEffect(() => {
+    const isMobile = window.innerWidth < 768; // 768px is the md breakpoint in Tailwind
+    console.log(`[DEBUG] 📐 Window width: ${window.innerWidth}px, Using ${isMobile ? 'mobile' : 'desktop'} thread view`);
+    
+    const handleResize = () => {
+      const isMobile = window.innerWidth < 768;
+      console.log(`[DEBUG] 📐 Window resized to ${window.innerWidth}px, Using ${isMobile ? 'mobile' : 'desktop'} thread view`);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -1577,7 +1639,12 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
                       </div>
                     );
                   })}
-                  <div ref={threadMessagesEndRef} />
+                  <div 
+                    ref={(el) => {
+                      threadMessagesEndRef.current = el;
+                      console.log(`[DEBUG] 🎯 Desktop thread messages end ref attached: ${!!el}`);
+                    }} 
+                  />
                 </div>
               )}
             </CustomScrollArea>
@@ -1774,7 +1841,12 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
                         </div>
                       );
                     })}
-                    <div ref={threadMessagesEndRef} />
+                    <div 
+                      ref={(el) => {
+                        mobileThreadMessagesEndRef.current = el;
+                        console.log(`[DEBUG] 🎯 Mobile thread messages end ref attached: ${!!el}`);
+                      }} 
+                    />
                   </div>
                 )}
               </CustomScrollArea>
