@@ -361,10 +361,16 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
         if (!payload.new || !('user_id' in payload.new)) return;
         const newMessage = payload.new;
 
+        console.log('INSERT event received:', newMessage);
+
         // Only add to messages if it's a top-level message
         if (newMessage.reply_to) {
+          console.log(`Message ${newMessage.id} is a reply to ${newMessage.reply_to}`);
+          
           // If we're viewing this thread, add the reply to the thread
           if (activeThreadMessage && activeThreadMessage.id === newMessage.reply_to) {
+            console.log(`Adding reply to currently open thread ${activeThreadMessage.id}`);
+            
             // Fetch the user profile
             const { data: profileData, error: profileError } = await supabase
               .from('profiles')
@@ -385,8 +391,35 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
 
             setThreadMessages(prev => [...prev, typedMessage]);
           }
+          
+          // Update reply count on the parent message in our local state
+          console.log(`Updating reply count for message ${newMessage.reply_to}`);
+          setMessages(prev => {
+            const updated = prev.map(msg => {
+              if (msg.id === newMessage.reply_to) {
+                const newCount = (msg.reply_count || 0) + 1;
+                console.log(`Updating reply count for message ${msg.id} from ${msg.reply_count} to ${newCount}`);
+                return {
+                  ...msg,
+                  reply_count: newCount
+                };
+              }
+              return msg;
+            });
+            
+            // Return unchanged array if no message was updated to avoid re-render
+            if (updated.every((msg, i) => msg === prev[i])) {
+              console.log('No reply count updates needed in UI');
+              return prev;
+            }
+            
+            return updated;
+          });
+          
           return;
         }
+        
+        console.log(`New top-level message ${newMessage.id} received, fetching user profile`);
         
         // Fetch the user profile
         const { data: profileData, error: profileError } = await supabase
@@ -406,10 +439,127 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
           user: profileData
         } as Message;
 
+        console.log(`Adding new message to UI: ${typedMessage.id}`);
         setMessages(prev => [...prev, typedMessage]);
       }
     },
     [currentChannel, activeThreadMessage]
+  );
+  
+  // Add subscription for DELETE events
+  useRealtimeSubscription<{
+    id: string;
+    content: string;
+    created_at: string;
+    user_id: string;
+    channel_id: string;
+    reply_to: string | null;
+  }>(
+    {
+      channel: `channel-delete:${currentChannel}`,
+      table: 'channel_messages',
+      event: 'DELETE',
+      filter: `channel_id=eq.${currentChannel}`,
+      callback: (payload) => {
+        if (!payload.old || !('id' in payload.old)) return;
+        
+        console.log('DELETE event received:', payload.old);
+        
+        // Type assertion for payload.old
+        const deletedMessage = payload.old as {
+          id: string;
+          content: string;
+          created_at: string;
+          user_id: string;
+          channel_id: string;
+          reply_to: string | null;
+        };
+        
+        const deletedMessageId = deletedMessage.id;
+        
+        // If the deleted message is in our current message list, remove it
+        setMessages(prev => {
+          const updatedMessages = prev.filter(m => m.id !== deletedMessageId);
+          console.log(`Removed message ${deletedMessageId} from UI, remaining: ${updatedMessages.length}`);
+          return updatedMessages;
+        });
+        
+        // If the deleted message is a reply to a message in our list,
+        // update the reply count of the parent message
+        if (deletedMessage.reply_to) {
+          console.log(`Message ${deletedMessageId} was a reply to ${deletedMessage.reply_to}, updating reply count`);
+          setMessages(prev => {
+            return prev.map(msg => {
+              if (msg.id === deletedMessage.reply_to) {
+                return {
+                  ...msg,
+                  reply_count: Math.max((msg.reply_count || 1) - 1, 0)
+                };
+              }
+              return msg;
+            });
+          });
+        }
+        
+        // If we're in thread view and the deleted message is in the thread, remove it
+        if (activeThreadMessage) {
+          if (deletedMessageId === activeThreadMessage.id) {
+            // If the thread parent was deleted, close the thread view
+            console.log('Thread parent was deleted, closing thread view');
+            setThreadView(false);
+            setActiveThreadMessage(null);
+            setThreadMessages([]);
+          } else if (deletedMessage.reply_to === activeThreadMessage.id) {
+            // If a thread reply was deleted, remove it from thread messages
+            console.log(`Thread reply ${deletedMessageId} was deleted, removing from thread UI`);
+            setThreadMessages(prev => prev.filter(m => m.id !== deletedMessageId));
+          }
+        }
+      }
+    },
+    [currentChannel, activeThreadMessage]
+  );
+  
+  // Add subscription for thread DELETE events
+  useRealtimeSubscription<{
+    id: string;
+    content: string;
+    created_at: string;
+    user_id: string;
+    channel_id: string;
+    reply_to: string | null;
+  }>(
+    {
+      channel: `thread-delete:${activeThreadMessage?.id || 'none'}`,
+      table: 'channel_messages',
+      event: 'DELETE',
+      filter: activeThreadMessage ? `reply_to=eq.${activeThreadMessage.id}` : undefined,
+      callback: (payload) => {
+        if (!payload.old || !('id' in payload.old)) return;
+        
+        console.log('Thread DELETE event received:', payload.old);
+        
+        // Type assertion for payload.old
+        const deletedMessage = payload.old as {
+          id: string;
+          content: string;
+          created_at: string;
+          user_id: string;
+          channel_id: string;
+          reply_to: string | null;
+        };
+        
+        const deletedMessageId = deletedMessage.id;
+        
+        // Remove the message from thread messages
+        setThreadMessages(prev => {
+          const updatedThreadMessages = prev.filter(m => m.id !== deletedMessageId);
+          console.log(`Removed message ${deletedMessageId} from thread UI, remaining: ${updatedThreadMessages.length}`);
+          return updatedThreadMessages;
+        });
+      }
+    },
+    [activeThreadMessage]
   );
 
   // Handle opening a thread
@@ -558,17 +708,9 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
 
       if (sendError) throw sendError;
 
-      // Update the reply count in the UI without refetching everything
-      if (activeThreadMessage) {
-        setMessages(prevMessages => 
-          prevMessages.map(msg => 
-            msg.id === activeThreadMessage.id 
-              ? { ...msg, reply_count: (msg.reply_count || 0) + 1 }
-              : msg
-          )
-        );
-      }
-
+      // We're removing the local reply count update and relying solely on the real-time subscription
+      // to update the reply count. This prevents the double-counting issue.
+      
       setThreadInput('');
       lastThreadTypedRef.current = 0;
       threadInputRef.current?.focus();
@@ -835,21 +977,61 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
     try {
       setIsDeleting(true);
       
+      console.log(`Starting delete operation for message ${messageToDelete.id}`);
+      console.log(`Message details: isThreadMessage=${isThreadMessage}, reply_count=${messageToDelete.reply_count}`);
+      
+      // If this is a main message with replies, delete all replies first
+      if (!isThreadMessage && messageToDelete.reply_count && messageToDelete.reply_count > 0) {
+        console.log(`Deleting ${messageToDelete.reply_count} replies to message ${messageToDelete.id}`);
+        
+        // Delete all replies to this message first
+        const { error: deleteRepliesError, count: deletedRepliesCount } = await supabase
+          .from('channel_messages')
+          .delete({ count: 'exact' })
+          .eq('reply_to', messageToDelete.id);
+        
+        if (deleteRepliesError) {
+          console.error('Error deleting replies:', deleteRepliesError);
+          // We'll continue with the main message deletion anyway
+          addToast(t('common.errors.deleteFailed') + ' (replies)', 'error');
+        } else {
+          console.log(`Successfully deleted ${deletedRepliesCount} replies for message ${messageToDelete.id}`);
+        }
+      }
+      
+      // Then delete the message itself
+      console.log(`Now deleting the message ${messageToDelete.id} itself`);
       const { error: deleteError } = await supabase
         .from('channel_messages')
         .delete()
         .eq('id', messageToDelete.id);
       
-      if (deleteError) throw deleteError;
+      if (deleteError) {
+        console.error('Error deleting message:', deleteError);
+        throw deleteError;
+      } else {
+        console.log(`Successfully deleted message ${messageToDelete.id}`);
+      }
       
       // Update UI based on whether it's a thread message or main message
       if (isThreadMessage) {
+        console.log(`Removing thread message ${messageToDelete.id} from UI`);
         setThreadMessages(prev => prev.filter(m => m.id !== messageToDelete.id));
       } else {
+        console.log(`Removing main message ${messageToDelete.id} from UI`);
         setMessages(prev => prev.filter(m => m.id !== messageToDelete.id));
+        
+        // If the deleted message was the active thread message, close the thread view
+        if (activeThreadMessage && activeThreadMessage.id === messageToDelete.id) {
+          console.log(`Closing thread view since message ${messageToDelete.id} was the active thread`);
+          setThreadView(false);
+          setActiveThreadMessage(null);
+          setThreadMessages([]);
+        }
       }
       
       // Show success toast with translation
+      console.log('Delete operation completed successfully');
       addToast(t('common.success.messageDeleted'), 'success');
       
     } catch (err) {
