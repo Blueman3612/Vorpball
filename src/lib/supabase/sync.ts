@@ -1,5 +1,8 @@
 import { supabase } from './client';
-import { getPlayers, getPlayerStats, Player, PlayerStats } from '../balldontlie/api';
+import { getPlayers, getPlayerStats, type PlayerStats } from '../balldontlie/api';
+import { NBA_CDN_URL } from '../utils';
+import { getNBAPlayerID } from '../nba/api';
+import type { Player } from '@/types/player';
 
 // Track the current sync process
 let currentAbortController: AbortController | null = null;
@@ -37,6 +40,65 @@ export async function syncPlayer(player: Player, signal?: AbortSignal) {
 
   console.log(`Syncing player: ${player.first_name} ${player.last_name} (ID: ${player.id})`);
   
+  // First, check if we need to sync the player's image
+  const fullName = `${player.first_name} ${player.last_name}`;
+  const { data: existingPlayer } = await supabase
+    .from('players')
+    .select('has_profile_picture, nba_cdn_id')
+    .eq('id', player.id)
+    .single();
+
+  // Only try to sync image if player doesn't have one yet
+  if (!existingPlayer?.has_profile_picture) {
+    console.log(`Checking for profile picture for ${fullName}`);
+    try {
+      // If we don't have the NBA CDN ID yet, try to find it
+      let nba_cdn_id = existingPlayer?.nba_cdn_id;
+      if (!nba_cdn_id) {
+        console.log(`Looking up NBA CDN ID for ${fullName}...`);
+        nba_cdn_id = await getNBAPlayerID(player.first_name, player.last_name);
+        if (nba_cdn_id) {
+          console.log(`Found NBA CDN ID for ${fullName}: ${nba_cdn_id}`);
+          player.nba_cdn_id = nba_cdn_id;
+        } else {
+          console.log(`No NBA CDN ID found for ${fullName}, skipping image sync`);
+        }
+      }
+
+      if (nba_cdn_id) {
+        const imageUrl = `${NBA_CDN_URL}/${nba_cdn_id}.png`;
+        const response = await fetch(imageUrl);
+        
+        if (response.ok) {
+          console.log(`Found image for ${fullName}, uploading to storage...`);
+          const imageBlob = await response.blob();
+          const filePath = `player-images/${nba_cdn_id}.png`;
+          
+          const { error: uploadError } = await supabase.storage
+            .from('players')
+            .upload(filePath, imageBlob, {
+              contentType: 'image/png',
+              upsert: true
+            });
+
+          if (!uploadError) {
+            console.log(`Successfully uploaded image for ${fullName}`);
+            player.has_profile_picture = true;
+            const { data: { publicUrl } } = supabase.storage
+              .from('players')
+              .getPublicUrl(filePath);
+            player.profile_picture_url = publicUrl;
+          } else {
+            console.error(`Error uploading image for ${fullName}:`, uploadError);
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`Error syncing image for ${fullName}:`, error);
+      // Continue with player sync even if image sync fails
+    }
+  }
+  
   const { data, error } = await supabase
     .from('players')
     .upsert({
@@ -53,6 +115,9 @@ export async function syncPlayer(player: Player, signal?: AbortSignal) {
       draft_year: player.draft_year,
       draft_round: player.draft_round,
       draft_number: player.draft_number,
+      has_profile_picture: player.has_profile_picture || false,
+      profile_picture_url: player.profile_picture_url,
+      nba_cdn_id: player.nba_cdn_id
     }, {
       onConflict: 'id'
     });

@@ -24,6 +24,18 @@ export interface Player {
     city: string;
     name: string;
   };
+  height: string;
+  weight: string;
+  jersey_number: string;
+  college: string;
+  country: string;
+  draft_year: number | null;
+  draft_round: number | null;
+  draft_number: number | null;
+  has_profile_picture?: boolean;
+  profile_picture_url?: string;
+  image_url?: string;
+  nba_cdn_id?: number;
 }
 
 export interface PlayerWithStats extends Player {

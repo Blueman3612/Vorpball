@@ -1,4 +1,8 @@
 import { PlayerWithStats } from '@/types/player';
+import { getPlayerImageUrl } from '@/lib/utils';
+import { ReactNode, useState, useEffect } from 'react';
+
+const NBA_FALLBACK_URL = 'https://cdn.nba.com/headshots/nba/latest/1040x760';
 
 interface PlayerTableProps {
   players: PlayerWithStats[];
@@ -15,7 +19,7 @@ export interface Column {
   key: ColumnKey;
   label: string;
   width?: string;
-  getValue?: (player: PlayerWithStats, index?: number) => string | number;
+  getValue?: (player: PlayerWithStats, index?: number) => string | number | ReactNode;
   getSortValue?: (player: PlayerWithStats) => string | number;
   isSpecial?: boolean;
 }
@@ -90,8 +94,19 @@ export const columns: Column[] = [
   { 
     key: 'last_name', 
     label: 'PLAYER', 
-    width: '100px', 
-    getValue: (player) => `${player.first_name} ${player.last_name}`,
+    width: '200px', 
+    getValue: (player) => (
+      <div className="flex items-center gap-3 relative h-8">
+        <div className="absolute bottom-[-8px] w-8 h-6 scale-150 origin-bottom">
+          <img
+            src={getPlayerImageUrl(player.first_name, player.last_name, player.id, player.profile_picture_url)}
+            alt={`${player.first_name} ${player.last_name}`}
+            className="w-full h-full object-contain"
+          />
+        </div>
+        <span className="pl-11">{`${player.first_name} ${player.last_name}`}</span>
+      </div>
+    ),
     getSortValue: (player) => player.last_name.toLowerCase()
   },
   { key: 'position', label: 'POS', width: '40px' },
@@ -195,29 +210,38 @@ export function PlayerTable({
     const column = columns.find(col => col.key === sortColumn);
     if (!column) return 0;
 
-    const aValue = column.getSortValue ? column.getSortValue(a) : 
-                column.getValue ? column.getValue(a) : 
-                  String(a[column.key as keyof PlayerWithStats] || '-').toLowerCase();
-    const bValue = column.getSortValue ? column.getSortValue(b) : 
-                column.getValue ? column.getValue(b) : 
-                  String(b[column.key as keyof PlayerWithStats] || '-').toLowerCase();
+    // Always use getSortValue for sorting if available
+    if (column.getSortValue) {
+      const aValue = column.getSortValue(a);
+      const bValue = column.getSortValue(b);
+
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return sortDirection === 'asc' 
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
+      }
+
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        const comparison = aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+        return sortDirection === 'asc' ? comparison : -comparison;
+      }
+    }
+
+    // Fallback to direct property access if no getSortValue
+    const aValue = String(a[column.key as keyof PlayerWithStats] || '-').toLowerCase();
+    const bValue = String(b[column.key as keyof PlayerWithStats] || '-').toLowerCase();
 
     if (aValue === '-' && bValue !== '-') return 1;
     if (aValue !== '-' && bValue === '-') return -1;
     if (aValue === '-' && bValue === '-') return 0;
 
-    if (typeof aValue === 'string' && typeof bValue === 'string') {
-      return sortDirection === 'asc' 
-        ? aValue.localeCompare(bValue)
-        : bValue.localeCompare(aValue);
-    }
-
-    const comparison = aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
-    return sortDirection === 'asc' ? comparison : -comparison;
+    return sortDirection === 'asc' 
+      ? aValue.localeCompare(bValue)
+      : bValue.localeCompare(aValue);
   });
 
   return (
-    <div className={`${className}`}>
+    <div className={className}>
       <table className="w-full text-sm border-separate border-spacing-0">
         <thead className="sticky top-0 z-10 bg-gray-100 dark:bg-gray-800">
           <tr>
