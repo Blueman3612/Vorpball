@@ -1,0 +1,5 @@
+---
+description: dark and light mode theming
+globs: 
+---
+Every UI elemnent should be properly styled to accomodate both light mode and dark mode.

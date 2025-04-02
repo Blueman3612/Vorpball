@@ -3,104 +3,161 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { 
-  HomeIcon, 
   UsersIcon, 
   ChartBarIcon, 
   TrophyIcon,
-  UserCircleIcon,
-  TableCellsIcon
+  TableCellsIcon,
+  ChatBubbleLeftRightIcon
 } from '@heroicons/react/24/outline';
-import ThemeToggle from '../ThemeToggle';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase/client';
+import { useTranslations, MessageKeys } from '@/lib/i18n';
+import { cn } from '@/lib/utils';
 
-const navigation = [
-  { name: 'Dashboard', href: '/', icon: HomeIcon },
-  { name: 'My Teams', href: '/teams', icon: UsersIcon },
-  { name: 'Players', href: '/players', icon: TableCellsIcon },
-  { name: 'League', href: '/league', icon: TrophyIcon },
-  { name: 'Stats & Analysis', href: '/stats', icon: ChartBarIcon },
-  { name: 'Profile', href: '/profile', icon: UserCircleIcon },
+interface Profile {
+  username: string | null;
+  full_name: string | null;
+  avatar_url: string | null;
+}
+
+interface NavigationItem {
+  name: MessageKeys;
+  href: string;
+  icon: React.ForwardRefExoticComponent<React.SVGProps<SVGSVGElement>>;
+}
+
+const navigation: NavigationItem[] = [
+  { name: 'common.navigation.league', href: '/league', icon: TrophyIcon },
+  { name: 'common.navigation.myTeams', href: '/teams', icon: UsersIcon },
+  { name: 'common.navigation.players', href: '/players', icon: TableCellsIcon },
+  { name: 'common.navigation.statsAndAnalysis', href: '/stats', icon: ChartBarIcon },
+  { name: 'common.navigation.talk', href: '/talk', icon: ChatBubbleLeftRightIcon },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, signOut, loading } = useAuth();
+  const { user, loading } = useAuth();
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const { t } = useTranslations();
 
   useEffect(() => {
     if (!loading && !user) {
       router.push('/auth/signin');
+      return;
+    }
+
+    async function getProfile() {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('username, full_name, avatar_url')
+          .eq('id', user?.id)
+          .single();
+
+        if (error) throw error;
+        setProfile(data);
+      } catch (error) {
+        console.error('Error loading profile:', error);
+      }
+    }
+
+    if (user) {
+      getProfile();
     }
   }, [user, loading, router]);
 
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      router.push('/auth/signin');
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
-  };
-
-  if (loading || !user) {
-    return null;
-  }
-
   return (
-    <div className="flex h-screen flex-col justify-between border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-      <div className="px-4 py-6">
-        <div className="flex items-center justify-between mb-8">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="h-10 w-10 rounded-lg bg-blue-600" />
-            <span className="text-xl font-bold text-gray-900 dark:text-white">Fantasy Basketball</span>
-          </Link>
-          <ThemeToggle />
+    <nav 
+      className={cn(
+        "group h-full transition-all duration-300 ease-in-out w-14 hover:w-56",
+        "bg-white dark:bg-gray-900",
+        "border-r border-gray-200 dark:border-gray-800"
+      )}
+      style={{ willChange: 'width' }}
+    >
+      <div className="h-full flex flex-col">
+        {/* App Logo/Title */}
+        <Link 
+          href="/dashboard" 
+          className={cn(
+            'p-3 flex items-center space-x-3 transition-all duration-200 rounded-md',
+            'active:scale-95',
+            pathname.startsWith('/dashboard')
+              ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+              : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+          )}
+        >
+          <div className="min-w-[28px] h-8 bg-blue-600 rounded flex-shrink-0"></div>
+          <div className="whitespace-nowrap overflow-hidden transition-all duration-300 opacity-0 group-hover:opacity-100">
+            <h1 className="text-gray-900 dark:text-white font-bold">VorpBall</h1>
+          </div>
+        </Link>
+
+        {/* Navigation Links */}
+        <div className="flex-1 space-y-1">
+          {navigation.map((item) => {
+            const isActive = pathname.startsWith(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  'flex items-center h-10 w-full',
+                  'text-sm font-medium rounded-md transition-all duration-200',
+                  'whitespace-nowrap overflow-hidden',
+                  'active:scale-95',
+                  isActive
+                    ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+                )}
+              >
+                <div className="w-14 flex items-center justify-center flex-shrink-0">
+                  <item.icon className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 pr-4">
+                  {t(item.name)}
+                </span>
+              </Link>
+            );
+          })}
         </div>
 
-        <nav className="flex flex-1 flex-col">
-          <ul role="list" className="flex flex-1 flex-col gap-y-4">
-            {navigation.map((item) => {
-              const isActive = pathname === item.href;
-              return (
-                <li key={item.name}>
-                  <Link
-                    href={item.href}
-                    className={`
-                      group flex gap-x-3 rounded-md p-2 text-sm font-semibold leading-6
-                      ${isActive 
-                        ? 'bg-gray-50 dark:bg-gray-800 text-blue-600' 
-                        : 'text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-500 hover:bg-gray-50 dark:hover:bg-gray-800'
-                      }
-                    `}
-                  >
-                    <item.icon className="h-6 w-6 shrink-0" aria-hidden="true" />
-                    {item.name}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
-      </div>
-
-      <div className="sticky inset-x-0 bottom-0 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
-        <div className="flex items-center gap-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg p-2" onClick={handleSignOut}>
-          <div className="relative h-10 w-10">
-            <Image
-              alt="User"
-              src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
-              fill
-              className="rounded-full object-cover"
-            />
+        {/* User Profile */}
+        <Link
+          href="/profile"
+          className={cn(
+            'flex items-center h-16 w-full',
+            'text-sm font-medium transition-all duration-200',
+            'whitespace-nowrap overflow-hidden',
+            'active:scale-95',
+            pathname.startsWith('/profile')
+              ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+              : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+          )}
+        >
+          <div className="w-14 flex items-center justify-center flex-shrink-0">
+            <div className="relative w-8 h-8">
+              {profile?.avatar_url ? (
+                <Image
+                  src={profile.avatar_url}
+                  alt={profile?.username || 'User'}
+                  fill
+                  className="rounded-full"
+                />
+              ) : (
+                <div className="w-full h-full bg-gray-200 dark:bg-gray-700 rounded-full" />
+              )}
+              <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white dark:border-gray-900" />
+            </div>
           </div>
-          <div>
-            <p className="text-sm font-medium text-gray-900 dark:text-white">{user.email}</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Sign out</p>
-          </div>
-        </div>
+          <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 pr-4">
+            {profile?.username || 'User'}
+          </span>
+        </Link>
       </div>
-    </div>
+    </nav>
   );
 } 
