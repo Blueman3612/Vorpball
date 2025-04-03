@@ -325,8 +325,8 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
   useEffect(() => {
     if (!currentChannel) return;
 
-    // Close any open thread when changing channels
-    if (threadView) {
+    // Only close thread if we're actually changing channels
+    if (threadView && activeThreadMessage?.channel_id !== currentChannel) {
       closeThread();
     }
 
@@ -650,9 +650,10 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
 
   // Handle opening a thread
   const openThread = async (message: Message) => {
-    setIsLoadingThread(true);
+    // Set thread view and message first
     setActiveThreadMessage(message);
     setThreadView(true);
+    setIsLoadingThread(true);
 
     try {
       // Fetch thread replies
@@ -689,10 +690,11 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
       })) as Message[];
 
       setThreadMessages(typedReplies);
-      
-      // Remove the setTimeout since we now handle scrolling in the useEffect
     } catch (err) {
       console.error('Error fetching thread replies:', err);
+      // On error, reset the thread view
+      setThreadView(false);
+      setActiveThreadMessage(null);
     } finally {
       setIsLoadingThread(false);
     }
