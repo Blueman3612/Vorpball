@@ -4,13 +4,12 @@ import { cn } from '@/lib/utils';
 interface LeagueCardProps {
   type: 'create' | 'info';
   league?: {
-    id: string;
     name: string;
-    scoring_type: 'category' | 'points' | 'both';
-    num_teams: number;
-    draft_type: 'snake' | 'auction' | 'linear';
-    draft_date: string | null;
-    status?: 'active' | 'draft' | 'completed';
+    status: 'active' | 'draft' | 'completed';
+    league: string;
+    rank: string;
+    record: string;
+    nextGame?: string;
   };
 }
 
@@ -49,9 +48,14 @@ export function LeagueCard({ type, league }: LeagueCardProps) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
             </svg>
           </div>
-          <p className="text-gray-600 dark:text-gray-400 text-center group-hover:text-primary-500 dark:group-hover:text-primary-400 transition-colors duration-200">
+          <span className={cn(
+            'text-base font-medium',
+            'text-gray-600 dark:text-gray-400',
+            'group-hover:text-primary-500 dark:group-hover:text-primary-400',
+            'transition-colors duration-200'
+          )}>
             Create New League
-          </p>
+          </span>
         </div>
       </Link>
     );
@@ -59,32 +63,64 @@ export function LeagueCard({ type, league }: LeagueCardProps) {
 
   if (!league) return null;
 
+  const statusColors = {
+    active: 'text-success-500 bg-success-50 dark:bg-success-900/20',
+    draft: 'text-warning-500 bg-warning-50 dark:bg-warning-900/20',
+    completed: 'text-gray-500 bg-gray-50 dark:bg-gray-800'
+  };
+
+  const statusText = {
+    active: 'Active',
+    draft: 'Draft',
+    completed: 'Completed'
+  };
+
   return (
     <Link 
-      href={`/league/${league.id}`}
+      href="/league/dashboard"
       className={cn(
         'block h-[280px] p-6',
-        'border border-gray-200 dark:border-gray-800',
+        'bg-white dark:bg-gray-800',
+        'border border-gray-200 dark:border-gray-700',
         'rounded-xl',
         'transition-all duration-200',
         'hover:border-primary-500 dark:hover:border-primary-500',
-        'hover:shadow-lg',
-        'bg-white dark:bg-gray-900'
+        'hover:shadow-md'
       )}
     >
       <div className="h-full flex flex-col">
-        <h3 className="text-xl font-semibold mb-2">{league.name}</h3>
-        <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
-          <p>Format: {league.scoring_type.charAt(0).toUpperCase() + league.scoring_type.slice(1)}</p>
-          <p>Teams: {league.num_teams}</p>
-          <p>Draft: {league.draft_type.charAt(0).toUpperCase() + league.draft_type.slice(1)}</p>
-          {league.draft_date && (
-            <p>Draft Date: {new Date(league.draft_date).toLocaleDateString()}</p>
-          )}
-          <p className="mt-4">
-            Status: <span className="capitalize">{league.status || 'draft'}</span>
-          </p>
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+            {league.name}
+          </h3>
+          <span className={cn(
+            'px-2.5 py-1 rounded-full text-xs font-medium',
+            statusColors[league.status]
+          )}>
+            {statusText[league.status]}
+          </span>
         </div>
+
+        <div className="space-y-4 flex-1">
+          <div>
+            <p className="text-sm text-gray-500 dark:text-gray-400">League</p>
+            <p className="text-base font-medium text-gray-900 dark:text-white">{league.league}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Rank</p>
+            <p className="text-base font-medium text-gray-900 dark:text-white">{league.rank}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Record</p>
+            <p className="text-base font-medium text-gray-900 dark:text-white">{league.record}</p>
+          </div>
+        </div>
+
+        {league.nextGame && (
+          <div className="pt-4 border-t border-gray-100 dark:border-gray-700">
+            <p className="text-sm text-gray-500 dark:text-gray-400">Next game in {league.nextGame}</p>
+          </div>
+        )}
       </div>
     </Link>
   );

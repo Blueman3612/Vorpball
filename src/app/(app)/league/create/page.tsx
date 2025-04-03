@@ -4,14 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { NumberInput } from "@/components/ui/number-input";
-import { useTranslations, type MessageKeys } from "@/lib/i18n";
+import { useTranslations } from "@/lib/i18n";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { addToast, ToastContainer } from "@/components/ui/toast";
 import { ConfirmationModal } from "@/components/ui/modal";
 import { Toggle } from "@/components/ui/toggle";
 import { cn } from "@/lib/utils";
-import { useRouter } from "next/navigation";
 
 interface ScoringTemplate {
   id: string;
@@ -83,7 +82,7 @@ const DEFAULT_TEMPLATES: ScoringTemplate[] = [
     fga: null,
     tpm: 1,
     tpa: null,
-    ftm: 1,
+    ftm: null,
     fta: null,
     dbl: null,
     tpl: null,
@@ -176,26 +175,14 @@ interface FormData {
   };
 }
 
-// Define valid translation prefixes as a type
-type ValidPrefix = 
-  | 'league.create.form.sections.scoring.stats'
-  | 'league.create.form.sections.roster.positions';
-
-export default function CreateLeaguePage() {
+export default function LeaguePage() {
   const { t } = useTranslations();
-  const router = useRouter();
-
-  // Translation helper for dynamic keys with type safety
-  const getTranslationKey = (prefix: ValidPrefix, key: string) => {
-    return `${prefix}.${key}` as MessageKeys;
-  };
-
   const [formData, setFormData] = useState<FormData>(() => {
     const vorpballTemplate = DEFAULT_TEMPLATES.find(t => t.id === 'vorpball')!;
     const initialData: FormData = {
       name: '',
       public: false,
-      scoringType: 'category',
+      scoringType: 'head-to-head',
       teams: 10,
       draftType: 'snake',
       draftDate: '',
@@ -232,8 +219,6 @@ export default function CreateLeaguePage() {
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
   const [isDeletingTemplate, setIsDeletingTemplate] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState<ScoringTemplate | null>(null);
-  const [hasWarnings, setHasWarnings] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const customTemplates = templates.filter(t => t.created_by !== null);
   const hasReachedTemplateLimit = customTemplates.length >= 5;
@@ -242,45 +227,30 @@ export default function CreateLeaguePage() {
     ([key, value]) => value !== DEFAULT_ROSTER[key as keyof typeof DEFAULT_ROSTER]
   );
 
-  const handleChange = (field: string, value: string | number | boolean | undefined) => {
-    // Handle undefined values
-    if (value === undefined) {
+  const handleChange = (field: string, value: string | number | boolean) => {
+    if (field === 'teams' && (value === '' || value === 0)) {
+      setFormData(prev => ({ ...prev, [field]: 10 }));
       return;
     }
-
-    // Ensure value is a number for numeric fields
-    if (field === 'teams') {
-      const numValue = Number(value) || 10; // Default to 10 if invalid
-      setFormData(prev => ({ ...prev, [field]: numValue }));
-      return;
-    }
-
-    // Handle all other value types
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleScoringChange = (stat: keyof typeof formData.scoring, value: number) => {
-    const numValue = value === undefined ? 0 : Number(value);
-    if (isNaN(numValue)) return;
-
     setFormData(prev => ({
       ...prev,
       scoring: {
         ...prev.scoring,
-        [stat]: numValue
+        [stat]: value
       }
     }));
   };
 
-  const handleRosterChange = (position: keyof typeof formData.roster, value: string | number) => {
-    const numValue = value === '' ? 0 : Number(value);
-    if (isNaN(numValue)) return;
-    
+  const handleRosterChange = (position: keyof typeof formData.roster, value: number) => {
     setFormData(prev => ({
       ...prev,
       roster: {
         ...prev.roster,
-        [position]: numValue
+        [position]: value
       }
     }));
   };
@@ -318,13 +288,20 @@ export default function CreateLeaguePage() {
   }, []);
 
   const handleTemplateChange = (value: string | number) => {
-    const templateId = String(value);
-    const template = templates.find(t => t.id === templateId);
+    const template = templates.find(t => t.id === value);
     if (!template) return;
 
-    setSelectedTemplate(templateId);
+    setSelectedTemplate(template.id);
     setFormData(prev => ({
       ...prev,
+      name: prev.name,
+      public: prev.public,
+      scoringType: prev.scoringType,
+      teams: prev.teams,
+      draftType: prev.draftType,
+      draftDate: prev.draftDate,
+      roster: prev.roster,
+      dynasty: prev.dynasty,
       scoring: {
         pts: Number(template.pts ?? 0),
         drbs: Number(template.drbs ?? 0),
@@ -396,18 +373,7 @@ export default function CreateLeaguePage() {
 
   const templatesMatch = (template1: Partial<ScoringTemplate>, template2: Partial<ScoringTemplate>): boolean => {
     const scoringFields = ['pts', 'drbs', 'orbs', 'asts', 'stls', 'blks', 'tos', 'fgm', 'fga', 'tpm', 'tpa', 'ftm', 'fta', 'dbl', 'tpl', 'qpl', 'fls', 'pt10', 'rb10', 'ast10'] as const;
-    return scoringFields.every(field => {
-      const val1 = template1[field] ?? 0;
-      const val2 = template2[field] ?? 0;
-      return Math.abs(Number(val1) - Number(val2)) < 0.001;
-    });
-  };
-
-  const hasTemplateChanges = () => {
-    const selectedTemplateData = templates.find(t => t.id === selectedTemplate);
-    if (!selectedTemplateData) return false;
-
-    return !templatesMatch(formData.scoring, selectedTemplateData);
+    return scoringFields.every(field => template1[field] === template2[field]);
   };
 
   const handleDeleteTemplate = async (template: ScoringTemplate) => {
@@ -549,109 +515,6 @@ export default function CreateLeaguePage() {
     }));
   };
 
-  const handleCreateLeague = async () => {
-    if (hasWarnings || !formData.name.trim()) {
-      addToast(
-        hasWarnings 
-          ? t('league.create.creation.validation.resolveWarnings')
-          : t('league.create.creation.validation.nameRequired'),
-        'error'
-      );
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      // Get current user first
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      if (!user) {
-        addToast(t('league.create.creation.error.loginRequired'), 'error');
-        return;
-      }
-
-      const draftDate = formData.draftDate ? new Date(formData.draftDate).toISOString() : null;
-
-      const { data: league, error } = await supabase
-        .from('leagues')
-        .insert([
-          {
-            name: formData.name,
-            created_by: user.id,
-            scoring_type: formData.scoringType,
-            num_teams: formData.teams,
-            draft_type: formData.draftType,
-            draft_date: draftDate,
-            status: 'draft',
-            // Add scoring settings
-            pts: formData.scoring.pts,
-            drbs: formData.scoring.drbs,
-            orbs: formData.scoring.orbs,
-            asts: formData.scoring.asts,
-            stls: formData.scoring.stls,
-            blks: formData.scoring.blks,
-            tos: formData.scoring.tos,
-            fgm: formData.scoring.fgm,
-            fga: formData.scoring.fga,
-            tpm: formData.scoring.tpm,
-            tpa: formData.scoring.tpa,
-            ftm: formData.scoring.ftm,
-            fta: formData.scoring.fta,
-            dbl: formData.scoring.dbl,
-            tpl: formData.scoring.tpl,
-            qpl: formData.scoring.qpl,
-            fls: formData.scoring.fls,
-            pt10: formData.scoring.pt10,
-            rb10: formData.scoring.rb10,
-            ast10: formData.scoring.ast10,
-            // Add roster settings
-            roster_pg: formData.roster.pg,
-            roster_sg: formData.roster.sg,
-            roster_sf: formData.roster.sf,
-            roster_pf: formData.roster.pf,
-            roster_c: formData.roster.c,
-            roster_g: formData.roster.g,
-            roster_f: formData.roster.f,
-            roster_gf: formData.roster.gf,
-            roster_fc: formData.roster.fc,
-            roster_util: formData.roster.util,
-            roster_bench: formData.roster.bench,
-            roster_ir: formData.roster.ir,
-            // Add dynasty settings
-            is_dynasty: formData.dynasty.enabled,
-            dynasty_keepers: formData.dynasty.keepers,
-            dynasty_salary_increase: formData.dynasty.salaryIncrease,
-            dynasty_rookies_exempt: formData.dynasty.rookiesExempt,
-          }
-        ])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      addToast(t('league.create.creation.success'), 'success');
-      router.push(`/league/${league.id}`);
-    } catch (error) {
-      console.error('Error creating league:', error);
-      addToast(t('league.create.creation.error.generic'), 'error');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Add effect to check for warnings
-  useEffect(() => {
-    // Add your warning checks here
-    const warnings = [
-      !formData.name.trim(), // Name is required
-      formData.teams < 2,    // Need at least 2 teams
-      // Add other warning conditions as needed
-    ];
-    
-    setHasWarnings(warnings.some(Boolean));
-  }, [formData]); // Update warnings when form data changes
-
   return (
     <div className="p-8">
       <ToastContainer />
@@ -659,14 +522,13 @@ export default function CreateLeaguePage() {
         isOpen={templateToDelete !== null}
         onClose={() => setTemplateToDelete(null)}
         onConfirm={() => templateToDelete && handleDeleteTemplate(templateToDelete)}
-        title={t('league.create.templates.delete.title')}
-        description={t('league.create.templates.delete.description', { name: templateToDelete?.name || 'Unknown Template' })}
-        confirmText={t('common.actions.delete')}
-        cancelText={t('common.actions.cancel')}
+        title="Delete Template"
+        description={`Are you sure you want to delete "${templateToDelete?.name}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
         isDestructive={true}
         isLoading={isDeletingTemplate}
       />
-      
       <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-8">
         {t('league.create.title')}
       </h1>
@@ -685,9 +547,7 @@ export default function CreateLeaguePage() {
                 />
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {t('common.labels.public')}
-                </span>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Public</span>
                 <Toggle
                   checked={formData.public}
                   onChange={(checked) => handleChange('public', checked)}
@@ -709,17 +569,17 @@ export default function CreateLeaguePage() {
             <div className="grid gap-8 md:grid-cols-2">
               <Select
                 label={t('league.create.form.sections.settings.scoringType.label')}
-                value={formData.scoringType || 'category'}
+                value={formData.scoringType}
                 onChange={(value) => handleChange('scoringType', value)}
                 options={[
-                  { value: 'category', label: t('league.create.form.sections.settings.scoringType.options.category') },
+                  { value: 'head-to-head', label: t('league.create.form.sections.settings.scoringType.options.headToHead') },
                   { value: 'points', label: t('league.create.form.sections.settings.scoringType.options.points') },
-                  { value: 'both', label: t('league.create.form.sections.settings.scoringType.options.both') }
+                  { value: 'roto', label: t('league.create.form.sections.settings.scoringType.options.roto') }
                 ]}
               />
               <NumberInput
                 label={t('league.create.form.sections.settings.teams.label')}
-                value={formData.teams}
+                value={Number(formData.teams)}
                 onChange={(value) => handleChange('teams', value)}
                 min={2}
                 max={16}
@@ -745,124 +605,296 @@ export default function CreateLeaguePage() {
               />
             </div>
           </div>
-        </div>
+      </div>
 
         {/* Scoring Settings Section */}
-        <div>
+          <div>
           <div className="px-8 py-5 border-y border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between gap-4">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                 {t('league.create.form.sections.scoring.title')}
               </h2>
-              <div className="flex flex-row items-center gap-3 flex-1 min-w-0">
-                <div className="w-64 max-w-full relative z-20">
-                  <Select
-                    label={t('common.labels.template')}
-                    value={selectedTemplate}
-                    onChange={handleTemplateChange}
-                    options={templates.map(template => ({
-                      value: template.id,
-                      label: (
-                        <div className="flex items-center justify-between w-full">
-                          <span>
-                            {template.name}
-                            {selectedTemplate === template.id && hasTemplateChanges() && (
-                              <span className="text-warning-500 dark:text-warning-400 ml-1">*</span>
-                            )}
-                          </span>
-                          {template.created_by && (
-                            <div
-                              role="button"
-                              tabIndex={0}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                const selectedTemplate = templates.find(t => t.id === template.id);
-                                if (!selectedTemplate) return;
-                                setTemplateToDelete(selectedTemplate);
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                  e.preventDefault();
+              <div className="flex flex-row flex-wrap items-start gap-2 flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <div className="w-64 max-w-full mt-2 relative z-20">
+                    <Select
+                      label="Template"
+                      value={selectedTemplate}
+                      onChange={handleTemplateChange}
+                      options={templates.map(template => ({
+                        value: template.id,
+                        label: (
+                          <div className="flex items-center justify-between w-full">
+                            <span>{template.name}</span>
+                            {template.created_by && (
+                              <div
+                                role="button"
+                                tabIndex={0}
+                                onClick={(e) => {
                                   e.stopPropagation();
                                   const selectedTemplate = templates.find(t => t.id === template.id);
                                   if (!selectedTemplate) return;
                                   setTemplateToDelete(selectedTemplate);
-                                }
-                              }}
-                              className="p-1 text-gray-400 hover:text-error-500 dark:text-gray-500 dark:hover:text-error-500 transition-colors ml-auto cursor-pointer"
-                            >
-                              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m4-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </div>
-                          )}
-                        </div>
-                      )
-                    }))}
-                  />
-                </div>
-                {!hasNonZeroValues && (
-                  <div className="flex items-center gap-1.5 text-error-500 dark:text-error-400">
-                    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
-                    </svg>
-                    <span className="text-sm font-medium">{t('common.validation.atLeastOneRequired')}</span>
-                  </div>
-                )}
-                <div className="flex items-center gap-2 ml-auto">
-                  {hasNonZeroValues && (
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={handleClearAll}
-                      className="mt-2"
-                    >
-                      {t('common.actions.clearAll')}
-                    </Button>
-                  )}
-                  <div className="flex-1" />
-                  <div className="flex items-center gap-2">
-                    <Input
-                      label={t('common.labels.customTemplate')}
-                      placeholder={hasReachedTemplateLimit 
-                        ? t('common.validation.templateLimitReached')
-                        : t('common.placeholders.enterTemplateName')
-                      }
-                      value={hasReachedTemplateLimit ? t('common.validation.templateLimitReached') : newTemplateName}
-                      onChange={(e) => setNewTemplateName(e.target.value.slice(0, 24))}
-                      className="w-64 max-w-full mt-2"
-                      maxLength={24}
-                      disabled={hasReachedTemplateLimit}
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    const selectedTemplate = templates.find(t => t.id === template.id);
+                                    if (!selectedTemplate) return;
+                                    setTemplateToDelete(selectedTemplate);
+                                  }
+                                }}
+                                className="p-1 text-gray-400 hover:text-error-500 dark:text-gray-500 dark:hover:text-error-500 transition-colors ml-auto cursor-pointer"
+                              >
+                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m4-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      }))}
                     />
-                    <Button
-                      variant="affirmative"
-                      size="sm"
-                      onClick={handleSaveTemplate}
-                      disabled={isSavingTemplate || !newTemplateName.trim() || hasReachedTemplateLimit}
-                      isLoading={isSavingTemplate}
-                      className="mt-2"
-                    >
-                      {t('common.actions.save')}
-                    </Button>
                   </div>
+                </div>
+                {hasNonZeroValues && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleClearAll}
+                    className="mt-2"
+                  >
+                    Clear All
+                  </Button>
+                )}
+                <div className="flex-1" />
+                <div className="flex items-center gap-2">
+                  <Input
+                    label="Custom Template"
+                    placeholder="Enter template name"
+                    value={hasReachedTemplateLimit ? "Custom template limit reached (5/5)" : newTemplateName}
+                    onChange={(e) => setNewTemplateName(e.target.value.slice(0, 24))}
+                    className="w-64 max-w-full mt-2"
+                    maxLength={24}
+                    disabled={hasReachedTemplateLimit}
+                  />
+                  <Button
+                    variant="affirmative"
+                    size="sm"
+                    onClick={handleSaveTemplate}
+                    disabled={isSavingTemplate || !newTemplateName.trim() || hasReachedTemplateLimit}
+                    isLoading={isSavingTemplate}
+                    className="mt-2"
+                  >
+                    Save
+                  </Button>
                 </div>
               </div>
             </div>
           </div>
           <div className="p-8">
             <div className="grid gap-6 grid-cols-[repeat(auto-fit,minmax(180px,1fr))]">
-              {Object.entries(formData.scoring).map(([key, value]) => (
-                <NumberInput
-                  key={`${key}-${selectedTemplate}`}
-                  label={t(getTranslationKey('league.create.form.sections.scoring.stats', key))}
-                  value={value}
-                  onChange={(value) => handleScoringChange(key as keyof typeof formData.scoring, value)}
-                  min={-100}
-                  max={100}
-                  step={0.05}
-                  defaultEmptyValue={0}
-                />
-              ))}
+              <NumberInput
+                key={`pts-${selectedTemplate}`}
+                label="Point"
+                value={formData.scoring.pts}
+                onChange={(value) => handleScoringChange('pts', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`drbs-${selectedTemplate}`}
+                label="D Rebound"
+                value={formData.scoring.drbs}
+                onChange={(value) => handleScoringChange('drbs', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`orbs-${selectedTemplate}`}
+                label="O Rebound"
+                value={formData.scoring.orbs}
+                onChange={(value) => handleScoringChange('orbs', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`asts-${selectedTemplate}`}
+                label="Assist"
+                value={formData.scoring.asts}
+                onChange={(value) => handleScoringChange('asts', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`stls-${selectedTemplate}`}
+                label="Steal"
+                value={formData.scoring.stls}
+                onChange={(value) => handleScoringChange('stls', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`blks-${selectedTemplate}`}
+                label="Block"
+                value={formData.scoring.blks}
+                onChange={(value) => handleScoringChange('blks', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`tos-${selectedTemplate}`}
+                label="Turnover"
+                value={formData.scoring.tos}
+                onChange={(value) => handleScoringChange('tos', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`fgm-${selectedTemplate}`}
+                label="FG Make"
+                value={formData.scoring.fgm}
+                onChange={(value) => handleScoringChange('fgm', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`fga-${selectedTemplate}`}
+                label="FG Attempt"
+                value={formData.scoring.fga}
+                onChange={(value) => handleScoringChange('fga', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`tpm-${selectedTemplate}`}
+                label="3P Make"
+                value={formData.scoring.tpm}
+                onChange={(value) => handleScoringChange('tpm', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`tpa-${selectedTemplate}`}
+                label="3P Attempt"
+                value={formData.scoring.tpa}
+                onChange={(value) => handleScoringChange('tpa', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`ftm-${selectedTemplate}`}
+                label="FT Make"
+                value={formData.scoring.ftm}
+                onChange={(value) => handleScoringChange('ftm', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`fta-${selectedTemplate}`}
+                label="FT Attempt"
+                value={formData.scoring.fta}
+                onChange={(value) => handleScoringChange('fta', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`dbl-${selectedTemplate}`}
+                label="Dbl Dbl"
+                value={formData.scoring.dbl}
+                onChange={(value) => handleScoringChange('dbl', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`tpl-${selectedTemplate}`}
+                label="Trp Dbl"
+                value={formData.scoring.tpl}
+                onChange={(value) => handleScoringChange('tpl', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`qpl-${selectedTemplate}`}
+                label="Quad Dbl"
+                value={formData.scoring.qpl}
+                onChange={(value) => handleScoringChange('qpl', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`fls-${selectedTemplate}`}
+                label="Foul"
+                value={formData.scoring.fls}
+                onChange={(value) => handleScoringChange('fls', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`pt10-${selectedTemplate}`}
+                label="10+ PTS"
+                value={formData.scoring.pt10}
+                onChange={(value) => handleScoringChange('pt10', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`rb10-${selectedTemplate}`}
+                label="10+ REB"
+                value={formData.scoring.rb10}
+                onChange={(value) => handleScoringChange('rb10', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
+              <NumberInput
+                key={`ast10-${selectedTemplate}`}
+                label="10+ AST"
+                value={formData.scoring.ast10}
+                onChange={(value) => handleScoringChange('ast10', value)}
+                min={-100}
+                max={100}
+                step={0.05}
+                defaultEmptyValue={0}
+              />
             </div>
           </div>
         </div>
@@ -883,7 +915,7 @@ export default function CreateLeaguePage() {
                     <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
                     </svg>
-                    <span className="text-sm font-medium">{t('common.validation.atLeastOneActiveSpot')}</span>
+                    <span className="text-sm font-medium">Must Have At Least 1 Active Roster Spot</span>
                   </div>
                 ) : (formData.roster.pg + formData.roster.sg + formData.roster.sf + 
                   formData.roster.pf + formData.roster.c + formData.roster.g + 
@@ -893,13 +925,13 @@ export default function CreateLeaguePage() {
                     <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
                     </svg>
-                    <span className="text-sm font-medium">{t('common.validation.recommendedRosterSize')}</span>
+                    <span className="text-sm font-medium">15 Roster Spots Highly Recommended</span>
                   </div>
                 )}
               </div>
               <div className="flex items-center gap-6 text-sm">
                 <div className="flex items-center gap-2">
-                  <span className="text-gray-500 dark:text-gray-400">{t('league.create.form.sections.roster.stats.active')}:</span>
+                  <span className="text-gray-500 dark:text-gray-400">Active:</span>
                   <span className="font-medium text-gray-900 dark:text-white">
                     {formData.roster.pg + formData.roster.sg + formData.roster.sf + 
                      formData.roster.pf + formData.roster.c + formData.roster.g + 
@@ -908,7 +940,7 @@ export default function CreateLeaguePage() {
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-gray-500 dark:text-gray-400">{t('league.create.form.sections.roster.stats.inactive')}:</span>
+                  <span className="text-gray-500 dark:text-gray-400">Inactive:</span>
                   <span className="font-medium text-gray-900 dark:text-white">
                     {formData.roster.bench}
                   </span>
@@ -919,7 +951,7 @@ export default function CreateLeaguePage() {
                     size="sm"
                     onClick={handleResetRoster}
                   >
-                    {t('common.actions.reset')}
+                    Reset
                   </Button>
                 )}
               </div>
@@ -927,22 +959,129 @@ export default function CreateLeaguePage() {
           </div>
           <div className="p-8">
             <div className="grid gap-6 grid-cols-[repeat(auto-fit,minmax(90px,1fr))]">
-              {Object.entries(formData.roster).map(([key, value]) => (
-                <NumberInput
-                  key={key}
-                  label={t(getTranslationKey('league.create.form.sections.roster.positions', key))}
-                  value={value}
-                  onChange={(value) => handleRosterChange(key as keyof typeof formData.roster, value)}
-                  min={0}
-                  max={99}
-                  step={1}
-                  defaultEmptyValue={0}
-                  minWidth="90px"
-                />
-              ))}
+              <NumberInput
+                label="PG"
+                value={formData.roster.pg}
+                onChange={(value) => handleRosterChange('pg', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
+              <NumberInput
+                label="SG"
+                value={formData.roster.sg}
+                onChange={(value) => handleRosterChange('sg', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
+              <NumberInput
+                label="SF"
+                value={formData.roster.sf}
+                onChange={(value) => handleRosterChange('sf', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
+              <NumberInput
+                label="PF"
+                value={formData.roster.pf}
+                onChange={(value) => handleRosterChange('pf', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
+              <NumberInput
+                label="C"
+                value={formData.roster.c}
+                onChange={(value) => handleRosterChange('c', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
+              <NumberInput
+                label="G"
+                value={formData.roster.g}
+                onChange={(value) => handleRosterChange('g', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
+              <NumberInput
+                label="F"
+                value={formData.roster.f}
+                onChange={(value) => handleRosterChange('f', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
+              <NumberInput
+                label="G/F"
+                value={formData.roster.gf}
+                onChange={(value) => handleRosterChange('gf', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
+              <NumberInput
+                label="F/C"
+                value={formData.roster.fc}
+                onChange={(value) => handleRosterChange('fc', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
+              <NumberInput
+                label="UTIL"
+                value={formData.roster.util}
+                onChange={(value) => handleRosterChange('util', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
+              <NumberInput
+                label="Bench"
+                value={formData.roster.bench}
+                onChange={(value) => handleRosterChange('bench', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
+              <NumberInput
+                label="IR"
+                value={formData.roster.ir}
+                onChange={(value) => handleRosterChange('ir', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
             </div>
-          </div>
         </div>
+      </div>
 
         {/* Dynasty League Section */}
         <div className={cn(
@@ -951,7 +1090,7 @@ export default function CreateLeaguePage() {
           <div className="px-8 py-5 border-y border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {t('league.create.form.sections.dynasty.title')}
+                Dynasty League
               </h2>
               <Toggle
                 checked={formData.dynasty?.enabled ?? false}
@@ -965,7 +1104,7 @@ export default function CreateLeaguePage() {
               <div className="flex flex-wrap items-center gap-8">
                 <div className="w-[140px]">
                   <NumberInput
-                    label={t('league.create.form.sections.dynasty.settings.keepers')}
+                    label="Keepers"
                     value={formData.dynasty?.keepers ?? 6}
                     onChange={(value) => handleDynastyChange('keepers', value)}
                     min={0}
@@ -980,7 +1119,7 @@ export default function CreateLeaguePage() {
                 </div>
                 <div className="w-[240px]">
                   <NumberInput
-                    label={t('league.create.form.sections.dynasty.settings.salaryIncrease')}
+                    label="Salary Increase"
                     value={formData.dynasty?.salaryIncrease ?? 5}
                     onChange={(value) => handleDynastyChange('salaryIncrease', value)}
                     min={0}
@@ -998,7 +1137,7 @@ export default function CreateLeaguePage() {
                   />
                   <div>
                     <span className="text-sm font-medium text-gray-900 dark:text-white">
-                      {t('league.create.form.sections.dynasty.settings.rookiesExempt')}
+                      Rookies Exempt From Salary Increase
                     </span>
                   </div>
                 </div>
@@ -1010,19 +1149,14 @@ export default function CreateLeaguePage() {
         {/* Action Buttons */}
         <div className="px-8 py-8 border-gray-200 dark:border-gray-700 flex justify-end gap-4">
           <Button
-            variant="affirmative"
-            onClick={handleCreateLeague}
-            disabled={isSubmitting || hasWarnings || !formData.name.trim()}
-            className="w-full sm:w-auto"
+            variant="outline"
           >
-            {isSubmitting ? (
-              <>
-                <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>
-                {t('common.states.creating')}
-              </>
-            ) : (
-              t('common.actions.create')
-            )}
+            {t('common.actions.saveAsDraft')}
+          </Button>
+          <Button
+            variant="affirmative"
+          >
+            {t('common.actions.create')}
           </Button>
         </div>
       </div>
