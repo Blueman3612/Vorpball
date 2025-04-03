@@ -139,8 +139,8 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
   const [threadInput, setThreadInput] = useState('');
   const [isLoadingThread, setIsLoadingThread] = useState(false);
   const [isSendingThreadReply, setIsSendingThreadReply] = useState(false);
-  const threadMessagesEndRef = useRef<HTMLDivElement>(null);
-  const mobileThreadMessagesEndRef = useRef<HTMLDivElement>(null); // Add separate ref for mobile view
+  const [threadMessagesEndElement, setThreadMessagesEndElement] = useState<HTMLDivElement | null>(null);
+  const [mobileThreadMessagesEndElement, setMobileThreadMessagesEndElement] = useState<HTMLDivElement | null>(null);
   const threadInputRef = useRef<HTMLInputElement>(null);
   
   // Message deletion state
@@ -153,24 +153,24 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
   const isThreadReplyUpdate = useRef(false);
 
   // Scroll to bottom of messages
-  const scrollToBottom = () => {
+  const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  }, []);
 
   // Scroll to bottom of thread messages
-  const scrollThreadToBottom = (forceScroll = false) => {
+  const scrollThreadToBottom = useCallback((forceScroll = false) => {
     // Use matchMedia to check if we're in mobile view
     const isMobile = window.matchMedia('(max-width: 767px)').matches;
     
-    // Use the appropriate ref based on the current view
-    const refToUse = isMobile ? mobileThreadMessagesEndRef : threadMessagesEndRef;
+    // Use the appropriate element based on the current view
+    const elementToUse = isMobile ? mobileThreadMessagesEndElement : threadMessagesEndElement;
 
-    if (refToUse.current) {
-      refToUse.current.scrollIntoView({ 
+    if (elementToUse) {
+      elementToUse.scrollIntoView({ 
         behavior: forceScroll ? 'auto' : 'smooth'
       });
     }
-  };
+  }, [threadMessagesEndElement, mobileThreadMessagesEndElement]);
 
   useEffect(() => {
     // Only scroll when not in thread view and not updating from a thread reply
@@ -184,7 +184,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
         }, 0);
       }
     }
-  }, [messages, threadView]);
+  }, [messages, threadView, scrollToBottom]);
 
   useEffect(() => {
     // Only scroll if there are messages in the thread
@@ -194,15 +194,16 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
         scrollThreadToBottom();
       }, 50);
     }
-  }, [threadMessages, threadView]);
+  }, [threadMessages, threadView, scrollThreadToBottom]);
 
   // Add a new effect to scroll when thread view is opened
-  useEffect(() => {    
-    if (threadView && !isLoadingThread && threadMessages.length > 0) {
-      // Use forceScroll=true to make it immediate on thread open
-      scrollThreadToBottom(true);
+  useEffect(() => {
+    if (threadView) {
+      setTimeout(() => {
+        scrollThreadToBottom(true);
+      }, 100);
     }
-  }, [threadView, isLoadingThread, threadMessages.length]);
+  }, [threadView, scrollThreadToBottom]);
 
   // Add effect to fetch league name
   useEffect(() => {
@@ -382,7 +383,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
     }
 
     fetchMessages();
-  }, [currentChannel]);
+  }, [currentChannel, threadView]);
 
   // Replace the message subscription effect with useRealtimeSubscription
   useRealtimeSubscription<{
@@ -1584,9 +1585,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
                     );
                   })}
                   <div 
-                    ref={(el) => {
-                      threadMessagesEndRef.current = el;
-                    }} 
+                    ref={setThreadMessagesEndElement}
                   />
                 </div>
               )}
@@ -1789,9 +1788,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
                       );
                     })}
                     <div 
-                      ref={(el) => {
-                        mobileThreadMessagesEndRef.current = el;
-                      }} 
+                      ref={setMobileThreadMessagesEndElement}
                     />
                   </div>
                 )}

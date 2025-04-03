@@ -182,7 +182,7 @@ export default function LeaguePage() {
     const initialData: FormData = {
       name: '',
       public: false,
-      scoringType: 'head-to-head',
+      scoringType: 'category',
       teams: 10,
       draftType: 'snake',
       draftDate: '',
@@ -572,9 +572,9 @@ export default function LeaguePage() {
                 value={formData.scoringType}
                 onChange={(value) => handleChange('scoringType', value)}
                 options={[
-                  { value: 'head-to-head', label: t('league.create.form.sections.settings.scoringType.options.headToHead') },
+                  { value: 'category', label: t('league.create.form.sections.settings.scoringType.options.category') },
                   { value: 'points', label: t('league.create.form.sections.settings.scoringType.options.points') },
-                  { value: 'roto', label: t('league.create.form.sections.settings.scoringType.options.roto') }
+                  { value: 'both', label: t('league.create.form.sections.settings.scoringType.options.both') }
                 ]}
               />
               <NumberInput

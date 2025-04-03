@@ -20,6 +20,17 @@ interface LeagueMemberResponse {
   league: League;
 }
 
+function transformLeagueForCard(league: League) {
+  return {
+    name: league.name,
+    status: league.status,
+    league: `${league.num_teams} Teams - ${league.scoring_type.charAt(0).toUpperCase() + league.scoring_type.slice(1)}`,
+    rank: 'N/A', // TODO: Add rank calculation
+    record: 'N/A', // TODO: Add record calculation
+    nextGame: league.draft_date ? `Draft on ${new Date(league.draft_date).toLocaleDateString()}` : undefined
+  };
+}
+
 export default function LeaguePage() {
   const [leagues, setLeagues] = useState<League[]>([]);
   const [loading, setLoading] = useState(true);
@@ -155,7 +166,7 @@ export default function LeaguePage() {
               <LeagueCard 
                 key={league.id} 
                 type="info" 
-                league={league}
+                league={transformLeagueForCard(league)}
               />
             ))}
           </div>

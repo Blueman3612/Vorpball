@@ -19,11 +19,7 @@ const nextConfig = {
         hostname: 'cdn.nba.com'
       }
     ]
-  },
-  i18n: {
-    defaultLocale: 'en',
-    locales: ['en'],
-  },
+  }
 };
 
 module.exports = nextConfig; 
