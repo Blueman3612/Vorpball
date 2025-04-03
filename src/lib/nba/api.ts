@@ -23,8 +23,8 @@ export async function getNBAPlayerID(firstName: string, lastName: string): Promi
     const players = data.resultSets[0].rowSet;
     
     // Find player by name
-    const player = players.find((p: any[]) => {
-      const [_, playerName] = p;
+    const player = players.find((player: [number, string, ...unknown[]]) => {
+      const [, playerName] = player;
       const [playerLastName, playerFirstName] = playerName.split(', ');
       return playerFirstName.toLowerCase() === firstName.toLowerCase() && 
              playerLastName.toLowerCase() === lastName.toLowerCase();

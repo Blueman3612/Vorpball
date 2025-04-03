@@ -1,8 +1,7 @@
 import { PlayerWithStats } from '@/types/player';
 import { getPlayerImageUrl } from '@/lib/utils';
-import { ReactNode, useState, useEffect } from 'react';
-
-const NBA_FALLBACK_URL = 'https://cdn.nba.com/headshots/nba/latest/1040x760';
+import { ReactNode } from 'react';
+import Image from 'next/image';
 
 interface PlayerTableProps {
   players: PlayerWithStats[];
@@ -98,10 +97,12 @@ export const columns: Column[] = [
     getValue: (player) => (
       <div className="flex items-center gap-3 relative h-8">
         <div className="absolute bottom-[-8px] w-8 h-6 scale-150 origin-bottom">
-          <img
+          <Image
             src={getPlayerImageUrl(player.first_name, player.last_name, player.id, player.profile_picture_url)}
             alt={`${player.first_name} ${player.last_name}`}
             className="w-full h-full object-contain"
+            width={32}
+            height={24}
           />
         </div>
         <span className="pl-11">{`${player.first_name} ${player.last_name}`}</span>

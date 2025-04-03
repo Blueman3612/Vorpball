@@ -486,7 +486,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
         }
       }
     },
-    [currentChannel, activeThreadMessage]
+    [currentChannel, activeThreadMessage, threadView]
   );
   
   // Add subscription for DELETE events

@@ -18,6 +18,13 @@ export function getThemeColorClass(
   return `${prefix}-${color}-${shade}`;
 }
 
+export const NBA_CDN_URL = 'https://cdn.nba.com/headshots/nba/latest/1040x760';
+
+export function getPlayerImageUrl(firstName: string, lastName: string, playerId: number, profilePictureUrl?: string): string {
+  if (profilePictureUrl) return profilePictureUrl;
+  return `${NBA_CDN_URL}/${playerId}.png`;
+}
+
 // Example usage:
 // getThemeColorClass('primary', 600, 'bg') => 'bg-primary-600'
 // getThemeColorClass('error', 500, 'text') => 'text-error-500' 
