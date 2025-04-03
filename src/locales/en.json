@@ -15,9 +15,11 @@
       "reset": "Reset",
       "inviteMember": "Invite Member",
       "sendMessage": "Send a message...",
+      "replyInThread": "Reply in thread...",
       "addTeamToTrade": "Add Team to Trade",
       "addPlayer": "Add Player",
-      "proposeTrade": "Propose Trade"
+      "proposeTrade": "Propose Trade",
+      "deleteMessage": "Delete Message"
     },
     "navigation": {
       "league": "League",
@@ -47,13 +49,15 @@
       "unexpectedError": "An unexpected error occurred. Please try again later.",
       "noAccess": "You do not have access to this league.",
       "inviteGenerationFailed": "Failed to generate invite code",
-      "noPostPermission": "You don't have permission to post in this channel"
+      "noPostPermission": "You don't have permission to post in this channel",
+      "deleteFailed": "Failed to delete message"
     },
     "success": {
       "changesSaved": "Changes saved successfully",
       "preferenceUpdated": "Preference updated",
       "photoUpdated": "Profile photo updated successfully",
-      "inviteCopied": "Invite code copied to clipboard!"
+      "inviteCopied": "Invite code copied to clipboard!",
+      "messageDeleted": "Message deleted successfully"
     },
     "languages": {
       "title": "Language",
@@ -86,11 +90,15 @@
     "chat": {
       "channels": "Channels",
       "noMessages": "No messages yet",
+      "thread": "Thread",
+      "noReplies": "No replies yet",
       "typingIndicator": {
         "single": "{username} is typing...",
         "double": "{username1} and {username2} are typing...",
         "multiple": "{count} people are typing..."
-      }
+      },
+      "deleteMessageTitle": "Delete Message",
+      "deleteMessageDescription": "Are you sure you want to delete this message? This action cannot be undone."
     },
     "sections": {
       "leagueStandings": "League Standings",

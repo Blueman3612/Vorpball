@@ -1,5 +1,12 @@
 ---
+description: 
+globs: 
+alwaysApply: false
+---
+---
 description: Always Use Internationalization
 globs: 
 ---
 When adding text, always keep our internationalization in mind.
+
+Use our translation hook and update our English json [en.json](mdc:src/locales/en.json)

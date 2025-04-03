@@ -19,6 +19,12 @@ export function useRealtimeSubscription<T extends Record<string, unknown>>(
   configRef.current = config;
 
   useEffect(() => {
+    // Log debugging information
+    console.log(`Setting up ${config.event} subscription for ${config.table}`, {
+      channel: config.channel,
+      filter: config.filter
+    });
+    
     const channel = supabase.channel(config.channel);
     
     channel.on(
@@ -29,13 +35,19 @@ export function useRealtimeSubscription<T extends Record<string, unknown>>(
         table: config.table,
         filter: config.filter,
       },
-      (payload: RealtimePostgresChangesPayload<T>) => config.callback(payload)
+      (payload: RealtimePostgresChangesPayload<T>) => {
+        console.log(`Received ${config.event} event for ${config.table}:`, payload);
+        configRef.current.callback(payload);
+      }
     )
-    .subscribe();
+    .subscribe((status) => {
+      console.log(`Channel ${config.channel} subscription status:`, status);
+    });
 
     channelRef.current = channel;
 
     return () => {
+      console.log(`Cleaning up subscription for ${config.channel}`);
       channel.unsubscribe();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
