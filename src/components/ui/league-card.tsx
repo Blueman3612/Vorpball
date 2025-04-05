@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 interface LeagueCardProps {
   type: 'create' | 'info';
   league?: {
+    id?: string;
     name: string;
     status: 'active' | 'draft' | 'completed';
     league: string;
@@ -77,7 +78,7 @@ export function LeagueCard({ type, league }: LeagueCardProps) {
 
   return (
     <Link 
-      href="/league/dashboard"
+      href={`/league/${league.id}`}
       className={cn(
         'block h-[280px] p-6',
         'bg-white dark:bg-gray-800',

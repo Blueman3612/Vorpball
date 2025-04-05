@@ -22,6 +22,7 @@ interface LeagueMemberResponse {
 
 function transformLeagueForCard(league: League) {
   return {
+    id: league.id,
     name: league.name,
     status: league.status,
     league: `${league.num_teams} Teams - ${league.scoring_type.charAt(0).toUpperCase() + league.scoring_type.slice(1)}`,
@@ -38,6 +39,7 @@ export default function LeaguePage() {
   async function fetchLeagues() {
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
       if (userError) throw userError;
       if (!user) return;
 
