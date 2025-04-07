@@ -869,6 +869,29 @@ function SettingsTab() {
     }
   };
 
+  const SCORING_LABELS: Record<string, string> = {
+    pts: 'Point',
+    drbs: 'D Rebound',
+    orbs: 'O Rebound',
+    asts: 'Assist',
+    stls: 'Steal',
+    blks: 'Block',
+    tos: 'Turnover',
+    fgm: 'FG Make',
+    fga: 'FG Attempt',
+    tpm: '3P Make',
+    tpa: '3P Attempt',
+    ftm: 'FT Make',
+    fta: 'FT Attempt',
+    dbl: 'Dbl Dbl',
+    tpl: 'Trp Dbl',
+    qpl: 'Quad Dbl',
+    fls: 'Foul',
+    pt10: '10+ PTS',
+    rb10: '10+ REB',
+    ast10: '10+ AST'
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-16rem)]">
@@ -1059,7 +1082,7 @@ function SettingsTab() {
               {Object.entries(formData.scoring).map(([key, value]) => (
                 <NumberInput
                   key={`${key}-${selectedTemplate}`}
-                  label={key.toUpperCase()}
+                  label={SCORING_LABELS[key]}
                   value={value}
                   onChange={(value) => handleScoringChange(key as keyof typeof formData.scoring, value)}
                   min={-100}
@@ -1132,19 +1155,126 @@ function SettingsTab() {
           </div>
           <div className="p-8">
             <div className="grid gap-6 grid-cols-[repeat(auto-fit,minmax(90px,1fr))]">
-              {Object.entries(formData.roster).map(([key, value]) => (
-                <NumberInput
-                  key={key}
-                  label={key.toUpperCase()}
-                  value={value}
-                  onChange={(value) => handleRosterChange(key as keyof typeof DEFAULT_ROSTER, value)}
-                  min={0}
-                  max={99}
-                  step={1}
-                  defaultEmptyValue={0}
-                  minWidth="90px"
-                />
-              ))}
+              <NumberInput
+                label="PG"
+                value={formData.roster.pg}
+                onChange={(value) => handleRosterChange('pg', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
+              <NumberInput
+                label="SG"
+                value={formData.roster.sg}
+                onChange={(value) => handleRosterChange('sg', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
+              <NumberInput
+                label="SF"
+                value={formData.roster.sf}
+                onChange={(value) => handleRosterChange('sf', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
+              <NumberInput
+                label="PF"
+                value={formData.roster.pf}
+                onChange={(value) => handleRosterChange('pf', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
+              <NumberInput
+                label="C"
+                value={formData.roster.c}
+                onChange={(value) => handleRosterChange('c', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
+              <NumberInput
+                label="G"
+                value={formData.roster.g}
+                onChange={(value) => handleRosterChange('g', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
+              <NumberInput
+                label="F"
+                value={formData.roster.f}
+                onChange={(value) => handleRosterChange('f', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
+              <NumberInput
+                label="G/F"
+                value={formData.roster.gf}
+                onChange={(value) => handleRosterChange('gf', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
+              <NumberInput
+                label="F/C"
+                value={formData.roster.fc}
+                onChange={(value) => handleRosterChange('fc', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
+              <NumberInput
+                label="UTIL"
+                value={formData.roster.util}
+                onChange={(value) => handleRosterChange('util', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
+              <NumberInput
+                label="Bench"
+                value={formData.roster.bench}
+                onChange={(value) => handleRosterChange('bench', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
+              <NumberInput
+                label="IR"
+                value={formData.roster.ir}
+                onChange={(value) => handleRosterChange('ir', value)}
+                min={0}
+                max={99}
+                step={1}
+                defaultEmptyValue={0}
+                minWidth="90px"
+              />
             </div>
           </div>
         </div>
