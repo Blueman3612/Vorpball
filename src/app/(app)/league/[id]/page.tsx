@@ -396,6 +396,7 @@ function SettingsTab() {
       ast10: 0
     }
   }));
+  const [initialFormData, setInitialFormData] = useState<FormData | null>(null);
   const [templates, setTemplates] = useState<ScoringTemplate[]>(DEFAULT_TEMPLATES);
   const [selectedTemplate, setSelectedTemplate] = useState<string>('vorpball');
   const [newTemplateName, setNewTemplateName] = useState('');
@@ -407,6 +408,24 @@ function SettingsTab() {
 
   const hasNonZeroValues = Object.values(formData.scoring).some(value => value !== 0);
   const hasRosterChanges = JSON.stringify(formData.roster) !== JSON.stringify(DEFAULT_ROSTER);
+
+  // Add this function to check if settings have changed
+  const hasSettingsChanged = () => {
+    if (!initialFormData) return false;
+    
+    // Compare all form fields with initial values
+    return (
+      formData.name !== initialFormData.name ||
+      formData.public !== initialFormData.public ||
+      formData.scoringType !== initialFormData.scoringType ||
+      formData.teams !== initialFormData.teams ||
+      formData.draftType !== initialFormData.draftType ||
+      formData.draftDate !== initialFormData.draftDate ||
+      JSON.stringify(formData.roster) !== JSON.stringify(initialFormData.roster) ||
+      JSON.stringify(formData.dynasty) !== JSON.stringify(initialFormData.dynasty) ||
+      JSON.stringify(formData.scoring) !== JSON.stringify(initialFormData.scoring)
+    );
+  };
 
   useEffect(() => {
     async function fetchLeagueSettings() {
@@ -476,7 +495,7 @@ function SettingsTab() {
         console.log('Successfully fetched league data:', leagueData);
 
         // Transform the data to match our form structure
-        setFormData({
+        const transformedData: FormData = {
           name: leagueData.name,
           public: leagueData.is_public,
           scoringType: leagueData.scoring_type,
@@ -525,7 +544,10 @@ function SettingsTab() {
             rb10: leagueData.rb10 || 0,
             ast10: leagueData.ast10 || 0
           }
-        });
+        };
+
+        setFormData(transformedData);
+        setInitialFormData(transformedData);
       } catch (error) {
         console.error('Error fetching league settings:', error);
         addToast('Failed to load league settings', 'error');
@@ -836,6 +858,8 @@ function SettingsTab() {
 
       if (error) throw error;
 
+      // Update initialFormData to match the current formData after successful save
+      setInitialFormData({ ...formData });
       addToast('Settings saved successfully', 'success');
     } catch (error) {
       console.error('Error saving settings:', error);
@@ -1194,6 +1218,7 @@ function SettingsTab() {
             variant="affirmative"
             onClick={handleSaveSettings}
             isLoading={isSaving}
+            disabled={!hasSettingsChanged()}
           >
             Save Changes
           </Button>
