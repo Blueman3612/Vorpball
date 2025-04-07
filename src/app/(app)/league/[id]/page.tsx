@@ -787,14 +787,50 @@ function SettingsTab() {
         .from('leagues')
         .update({
           name: formData.name,
-          public: formData.public,
+          is_public: formData.public,
           scoring_type: formData.scoringType,
           num_teams: formData.teams,
           draft_type: formData.draftType,
           draft_date: formData.draftDate || null,
-          roster_settings: formData.roster,
-          dynasty_settings: formData.dynasty,
-          scoring_settings: formData.scoring
+          // Individual roster fields
+          roster_pg: formData.roster.pg,
+          roster_sg: formData.roster.sg,
+          roster_sf: formData.roster.sf,
+          roster_pf: formData.roster.pf,
+          roster_c: formData.roster.c,
+          roster_g: formData.roster.g,
+          roster_f: formData.roster.f,
+          roster_gf: formData.roster.gf,
+          roster_fc: formData.roster.fc,
+          roster_util: formData.roster.util,
+          roster_bench: formData.roster.bench,
+          roster_ir: formData.roster.ir,
+          // Individual dynasty fields
+          is_dynasty: formData.dynasty.enabled,
+          dynasty_keepers: formData.dynasty.keepers,
+          dynasty_salary_increase: formData.dynasty.salaryIncrease,
+          dynasty_rookies_exempt: formData.dynasty.rookiesExempt,
+          // Individual scoring fields
+          pts: formData.scoring.pts,
+          drbs: formData.scoring.drbs,
+          orbs: formData.scoring.orbs,
+          asts: formData.scoring.asts,
+          stls: formData.scoring.stls,
+          blks: formData.scoring.blks,
+          tos: formData.scoring.tos,
+          fgm: formData.scoring.fgm,
+          fga: formData.scoring.fga,
+          tpm: formData.scoring.tpm,
+          tpa: formData.scoring.tpa,
+          ftm: formData.scoring.ftm,
+          fta: formData.scoring.fta,
+          dbl: formData.scoring.dbl,
+          tpl: formData.scoring.tpl,
+          qpl: formData.scoring.qpl,
+          fls: formData.scoring.fls,
+          pt10: formData.scoring.pt10,
+          rb10: formData.scoring.rb10,
+          ast10: formData.scoring.ast10
         })
         .eq('id', leagueId);
 
