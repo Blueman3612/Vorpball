@@ -383,7 +383,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
     }
 
     fetchMessages();
-  }, [currentChannel, threadView]);
+  }, [currentChannel, threadView, activeThreadMessage?.channel_id]);
 
   // Replace the message subscription effect with useRealtimeSubscription
   useRealtimeSubscription<{
@@ -1125,53 +1125,48 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
   // Set up listener for manual delete broadcasts
   useEffect(() => {
     if (!currentChannel) return;
-    
-    const channel = supabase.channel(`manual-delete:${currentChannel}`, {
-      config: {
-        broadcast: { self: false }
-      }
-    });
-    
+
+    const channel = supabase.channel(`manual-delete:${currentChannel}`);
+
     channel
       .on('broadcast', { event: 'manual_delete' }, (payload) => {
-        const { message_id, is_thread, reply_to } = payload.payload;
+        // Handle manual delete event
+        const { message_id, channel_id, is_thread, reply_to } = payload.payload;
         
-        if (!message_id) {
-          console.error('Invalid manual delete payload:', payload);
+        // If this is a thread message and we're not in the right thread, ignore it
+        if (is_thread && (!activeThreadMessage || activeThreadMessage.channel_id !== channel_id)) {
           return;
         }
         
-        // Force refresh the message list to ensure deleted messages don't appear
+        // If this is a main message and we're not in the right channel, ignore it
+        if (!is_thread && currentChannel !== channel_id) {
+          return;
+        }
+        
+        // Update messages state based on whether it's a thread message or main message
         if (is_thread) {
-          // This is a thread message
           setThreadMessages(prev => prev.filter(m => m.id !== message_id));
+          
+          // Update the reply count on the parent message if needed
+          if (reply_to) {
+            setMessages(prev => prev.map(msg => {
+              if (msg.id === reply_to) {
+                return {
+                  ...msg,
+                  reply_count: Math.max((msg.reply_count || 1) - 1, 0)
+                };
+              }
+              return msg;
+            }));
+          }
         } else {
-          // This is a main channel message
           setMessages(prev => prev.filter(m => m.id !== message_id));
           
-          // If this was the active thread message, close the thread
+          // If the deleted message was the active thread message, close the thread view
           if (activeThreadMessage && activeThreadMessage.id === message_id) {
             setThreadView(false);
             setActiveThreadMessage(null);
             setThreadMessages([]);
-          }
-          
-          // If this was a reply, update reply counts
-          if (reply_to) {
-            // Set the flag to prevent auto-scrolling for thread reply updates
-            isThreadReplyUpdate.current = true;
-            
-            setMessages(prev => 
-              prev.map(msg => {
-                if (msg.id === reply_to) {
-                  return {
-                    ...msg,
-                    reply_count: Math.max((msg.reply_count || 1) - 1, 0)
-                  };
-                }
-                return msg;
-              })
-            );
           }
         }
         
@@ -1183,7 +1178,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
     return () => {
       channel.unsubscribe();
     };
-  }, [currentChannel, activeThreadMessage]);
+  }, [currentChannel, activeThreadMessage?.channel_id, activeThreadMessage?.id, activeThreadMessage]);
 
   // Add debug information about the viewport
   useEffect(() => {

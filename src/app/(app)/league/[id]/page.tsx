@@ -364,38 +364,42 @@ function TalkTab() {
 function SettingsTab() {
   const { t } = useTranslations();
   const { id: leagueId } = useParams();
-  const [formData, setFormData] = useState<FormData>(() => ({
-    name: '',
-    public: false,
-    scoringType: 'category',
-    teams: 10,
-    draftType: 'snake',
-    draftDate: '',
-    roster: { ...DEFAULT_ROSTER },
-    dynasty: { ...DEFAULT_DYNASTY },
-    scoring: {
-      pts: 0,
-      drbs: 0,
-      orbs: 0,
-      asts: 0,
-      stls: 0,
-      blks: 0,
-      tos: 0,
-      fgm: 0,
-      fga: 0,
-      tpm: 0,
-      tpa: 0,
-      ftm: 0,
-      fta: 0,
-      dbl: 0,
-      tpl: 0,
-      qpl: 0,
-      fls: 0,
-      pt10: 0,
-      rb10: 0,
-      ast10: 0
-    }
-  }));
+  const [formData, setFormData] = useState<FormData>(() => {
+    const vorpballTemplate = DEFAULT_TEMPLATES.find(t => t.id === 'vorpball')!;
+    const initialData: FormData = {
+      name: '',
+      public: false,
+      scoringType: 'category',
+      teams: 10,
+      draftType: 'snake',
+      draftDate: '',
+      roster: { ...DEFAULT_ROSTER },
+      dynasty: { ...DEFAULT_DYNASTY },
+      scoring: {
+        pts: Number(vorpballTemplate.pts ?? 0),
+        drbs: Number(vorpballTemplate.drbs ?? 0),
+        orbs: Number(vorpballTemplate.orbs ?? 0),
+        asts: Number(vorpballTemplate.asts ?? 0),
+        stls: Number(vorpballTemplate.stls ?? 0),
+        blks: Number(vorpballTemplate.blks ?? 0),
+        tos: Number(vorpballTemplate.tos ?? 0),
+        fgm: Number(vorpballTemplate.fgm ?? 0),
+        fga: Number(vorpballTemplate.fga ?? 0),
+        tpm: Number(vorpballTemplate.tpm ?? 0),
+        tpa: Number(vorpballTemplate.tpa ?? 0),
+        ftm: Number(vorpballTemplate.ftm ?? 0),
+        fta: Number(vorpballTemplate.fta ?? 0),
+        dbl: Number(vorpballTemplate.dbl ?? 0),
+        tpl: Number(vorpballTemplate.tpl ?? 0),
+        qpl: Number(vorpballTemplate.qpl ?? 0),
+        fls: Number(vorpballTemplate.fls ?? 0),
+        pt10: Number(vorpballTemplate.pt10 ?? 0),
+        rb10: Number(vorpballTemplate.rb10 ?? 0),
+        ast10: Number(vorpballTemplate.ast10 ?? 0)
+      }
+    };
+    return initialData;
+  });
   const [initialFormData, setInitialFormData] = useState<FormData | null>(null);
   const [templates, setTemplates] = useState<ScoringTemplate[]>(DEFAULT_TEMPLATES);
   const [selectedTemplate, setSelectedTemplate] = useState<string>('vorpball');
@@ -403,8 +407,36 @@ function SettingsTab() {
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
   const [isDeletingTemplate, setIsDeletingTemplate] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState<ScoringTemplate | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+
+  const customTemplates = templates.filter(t => t.created_by !== null);
+  const hasReachedTemplateLimit = customTemplates.length >= 5;
+
+  const formToTemplateValues = (formScoring: typeof formData.scoring): Omit<ScoringTemplate, 'id' | 'name' | 'created_by' | 'created_at'> => {
+    return Object.fromEntries(
+      Object.entries(formScoring).map(([key, value]) => [key, value === 0 ? null : value])
+    ) as Omit<ScoringTemplate, 'id' | 'name' | 'created_by' | 'created_at'>;
+  };
+
+  const templatesMatch = (template1: Partial<ScoringTemplate>, template2: Partial<ScoringTemplate>): boolean => {
+    const scoringFields = ['pts', 'drbs', 'orbs', 'asts', 'stls', 'blks', 'tos', 'fgm', 'fga', 'tpm', 'tpa', 'ftm', 'fta', 'dbl', 'tpl', 'qpl', 'fls', 'pt10', 'rb10', 'ast10'] as const;
+    return scoringFields.every(field => template1[field] === template2[field]);
+  };
+
+  const fetchCustomTemplates = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('scoring_templates')
+        .select('*')
+        .not('created_by', 'is', null);
+      
+      if (error) throw error;
+      
+      setTemplates([...DEFAULT_TEMPLATES, ...(data || [])]);
+    } catch {
+      addToast('Failed to load custom templates', 'error');
+    }
+  };
 
   const hasNonZeroValues = Object.values(formData.scoring).some(value => value !== 0);
   const hasRosterChanges = JSON.stringify(formData.roster) !== JSON.stringify(DEFAULT_ROSTER);
@@ -430,7 +462,6 @@ function SettingsTab() {
   useEffect(() => {
     async function fetchLeagueSettings() {
       try {
-        setIsLoading(true);
         const { data: leagueData, error: leagueError } = await supabase
           .from('leagues')
           .select(`
@@ -543,10 +574,8 @@ function SettingsTab() {
 
         setFormData(transformedData);
         setInitialFormData(transformedData);
-      } catch (error) {
+      } catch {
         addToast('Failed to load league settings', 'error');
-      } finally {
-        setIsLoading(false);
       }
     }
 
@@ -554,22 +583,6 @@ function SettingsTab() {
   }, [leagueId]);
 
   useEffect(() => {
-    // Fetch custom templates
-    async function fetchCustomTemplates() {
-      try {
-        const { data, error } = await supabase
-          .from('scoring_templates')
-          .select('*')
-          .not('created_by', 'is', null);
-        
-        if (error) throw error;
-        
-        setTemplates([...DEFAULT_TEMPLATES, ...(data || [])]);
-      } catch (error) {
-        addToast('Failed to load custom templates', 'error');
-      }
-    }
-
     fetchCustomTemplates();
   }, []);
 
@@ -687,6 +700,7 @@ function SettingsTab() {
     try {
       setIsSavingTemplate(true);
 
+      // Get current user first to check template limit
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError) throw userError;
       if (!user) {
@@ -694,6 +708,26 @@ function SettingsTab() {
         return;
       }
 
+      // Check template limit
+      if (hasReachedTemplateLimit) {
+        addToast('You have reached the maximum limit of 5 custom templates', 'error');
+        return;
+      }
+
+      // Convert form values to template format (0s to NULLs)
+      const templateValues = formToTemplateValues(formData.scoring);
+
+      // Check if the template matches any default template
+      const matchingDefault = DEFAULT_TEMPLATES.find(defaultTemplate => 
+        templatesMatch(templateValues, defaultTemplate)
+      );
+
+      if (matchingDefault) {
+        addToast(`Cannot save - matches default template "${matchingDefault.name}"`, 'error');
+        return;
+      }
+
+      // Check if a template with this name already exists
       const { data: existingTemplates, error: checkError } = await supabase
         .from('scoring_templates')
         .select('name, created_by')
@@ -711,10 +745,7 @@ function SettingsTab() {
         return;
       }
 
-      const templateValues = Object.fromEntries(
-        Object.entries(formData.scoring).map(([key, value]) => [key, value === 0 ? null : value])
-      );
-
+      // Save the template with NULL values instead of 0s
       const { error: saveError } = await supabase
         .from('scoring_templates')
         .insert({
@@ -730,14 +761,9 @@ function SettingsTab() {
       setNewTemplateName('');
       
       // Refresh templates
-      const { data, error } = await supabase
-        .from('scoring_templates')
-        .select('*')
-        .not('created_by', 'is', null);
-      
-      if (error) throw error;
-      setTemplates([...DEFAULT_TEMPLATES, ...(data || [])]);
-    } catch (error) {
+      fetchCustomTemplates();
+    } catch (error: unknown) {
+      console.error('Error saving template:', error);
       addToast('Failed to save template', 'error');
     } finally {
       setIsSavingTemplate(false);
@@ -750,6 +776,7 @@ function SettingsTab() {
     try {
       setIsDeletingTemplate(true);
 
+      // Get current user
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError) throw userError;
       if (!user) {
@@ -757,6 +784,7 @@ function SettingsTab() {
         return;
       }
 
+      // Verify the template belongs to the user
       if (template.created_by !== user.id) {
         addToast('You can only delete your own templates', 'error');
         return;
@@ -777,14 +805,9 @@ function SettingsTab() {
       }
       
       // Refresh templates
-      const { data, error } = await supabase
-        .from('scoring_templates')
-        .select('*')
-        .not('created_by', 'is', null);
-      
-      if (error) throw error;
-      setTemplates([...DEFAULT_TEMPLATES, ...(data || [])]);
-    } catch (error) {
+      fetchCustomTemplates();
+    } catch (error: unknown) {
+      console.error('Error deleting template:', error);
       addToast('Failed to delete template', 'error');
     } finally {
       setIsDeletingTemplate(false);
@@ -848,11 +871,11 @@ function SettingsTab() {
         .eq('id', leagueId);
 
       if (error) throw error;
-
-      // Update initialFormData to match the current formData after successful save
-      setInitialFormData({ ...formData });
+      
+      setInitialFormData(formData);
       addToast('Settings saved successfully', 'success');
-    } catch (error) {
+    } catch (error: unknown) {
+      console.error('Error saving settings:', error);
       addToast('Failed to save settings', 'error');
     } finally {
       setIsSaving(false);
@@ -882,12 +905,12 @@ function SettingsTab() {
     ast10: '10+ AST'
   };
 
-  if (isLoading) {
+  if (isSavingTemplate || isDeletingTemplate) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-16rem)]">
         <div className="text-center">
           <div className="w-12 h-12 border-3 border-gray-300 border-t-primary-600 rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-500 dark:text-gray-400">Loading settings...</p>
+          <p className="text-gray-500 dark:text-gray-400">Saving or deleting template...</p>
         </div>
       </div>
     );
@@ -1099,7 +1122,7 @@ function SettingsTab() {
                   formData.roster.util) === 0 ? (
                   <div className="flex items-center gap-1.5 text-error-500 dark:text-error-400">
                     <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                     </svg>
                     <span className="text-sm font-medium">Must Have At Least 1 Active Roster Spot</span>
                   </div>
@@ -1109,7 +1132,7 @@ function SettingsTab() {
                   formData.roster.util + formData.roster.bench) !== 15 && (
                   <div className="flex items-center gap-1.5 text-warning-500 dark:text-warning-600">
                     <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                      <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v4a1 1 0 102 0v-4a.75.75 0 011.5 0zM10 14a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
                     </svg>
                     <span className="text-sm font-medium">15 Roster Spots Highly Recommended</span>
                   </div>
@@ -1351,9 +1374,9 @@ function SettingsTab() {
 export default function LeaguePage() {
   const { t } = useTranslations();
   const { id: leagueId } = useParams();
-  const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
   // Check if user has access to this league
   useEffect(() => {
@@ -1363,7 +1386,7 @@ export default function LeaguePage() {
         const { data: { user }, error: userError } = await supabase.auth.getUser();
         if (userError) throw userError;
         if (!user) {
-          setError('You must be logged in to view leagues.');
+          setErrorMessage('You must be logged in to view leagues.');
           return;
         }
 
@@ -1375,7 +1398,7 @@ export default function LeaguePage() {
           .single();
 
         if (leagueError || !leagueData) {
-          setError('You do not have access to this league.');
+          setErrorMessage('You do not have access to this league.');
           return;
         }
 
@@ -1391,9 +1414,10 @@ export default function LeaguePage() {
           setIsAdmin(memberData.role === 'admin');
         }
 
-        setError(null);
-      } catch (err) {
-        setError('An error occurred while checking league access.');
+        setErrorMessage(null);
+      } catch (error: unknown) {
+        console.error('Error checking access:', error);
+        setErrorMessage('An error occurred while checking league access.');
       } finally {
         setIsLoading(false);
       }
@@ -1412,8 +1436,8 @@ export default function LeaguePage() {
       </div>
     );
   }
-
-  if (error) {
+  
+  if (errorMessage) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
         <div className="text-center">
@@ -1422,7 +1446,7 @@ export default function LeaguePage() {
               <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
             </svg>
           </div>
-          <p className="text-gray-500 dark:text-gray-400">{error}</p>
+          <p className="text-gray-500 dark:text-gray-400">{errorMessage}</p>
         </div>
       </div>
     );
@@ -1471,7 +1495,7 @@ export default function LeaguePage() {
               size="sm"
               onClick={async () => {
                 try {
-                  const { data, error } = await supabase
+                  const { data } = await supabase
                     .from('league_invites')
                     .insert({
                       league_id: leagueId
@@ -1479,7 +1503,7 @@ export default function LeaguePage() {
                     .select('code')
                     .single();
 
-                  if (error) throw error;
+                  if (!data) throw new Error('Failed to generate invite code');
 
                   await navigator.clipboard.writeText(data.code);
                   addToast(t('common.success.inviteCopied'), 'success');
