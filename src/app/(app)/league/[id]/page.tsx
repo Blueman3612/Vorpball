@@ -431,7 +431,6 @@ function SettingsTab() {
     async function fetchLeagueSettings() {
       try {
         setIsLoading(true);
-        console.log('Fetching league settings for ID:', leagueId);
         const { data: leagueData, error: leagueError } = await supabase
           .from('leagues')
           .select(`
@@ -483,16 +482,12 @@ function SettingsTab() {
           .single();
 
         if (leagueError) {
-          console.error('Supabase error details:', leagueError);
           throw leagueError;
         }
 
         if (!leagueData) {
-          console.error('No league data found for ID:', leagueId);
           throw new Error('No league data found');
         }
-
-        console.log('Successfully fetched league data:', leagueData);
 
         // Transform the data to match our form structure
         const transformedData: FormData = {
@@ -549,7 +544,6 @@ function SettingsTab() {
         setFormData(transformedData);
         setInitialFormData(transformedData);
       } catch (error) {
-        console.error('Error fetching league settings:', error);
         addToast('Failed to load league settings', 'error');
       } finally {
         setIsLoading(false);
@@ -572,7 +566,6 @@ function SettingsTab() {
         
         setTemplates([...DEFAULT_TEMPLATES, ...(data || [])]);
       } catch (error) {
-        console.error('Error fetching custom templates:', error);
         addToast('Failed to load custom templates', 'error');
       }
     }
@@ -745,7 +738,6 @@ function SettingsTab() {
       if (error) throw error;
       setTemplates([...DEFAULT_TEMPLATES, ...(data || [])]);
     } catch (error) {
-      console.error('Error saving template:', error);
       addToast('Failed to save template', 'error');
     } finally {
       setIsSavingTemplate(false);
@@ -793,7 +785,6 @@ function SettingsTab() {
       if (error) throw error;
       setTemplates([...DEFAULT_TEMPLATES, ...(data || [])]);
     } catch (error) {
-      console.error('Error deleting template:', error);
       addToast('Failed to delete template', 'error');
     } finally {
       setIsDeletingTemplate(false);
@@ -862,7 +853,6 @@ function SettingsTab() {
       setInitialFormData({ ...formData });
       addToast('Settings saved successfully', 'success');
     } catch (error) {
-      console.error('Error saving settings:', error);
       addToast('Failed to save settings', 'error');
     } finally {
       setIsSaving(false);
@@ -1370,12 +1360,12 @@ export default function LeaguePage() {
     async function checkAccess() {
       try {
         setIsLoading(true);
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      if (!user) {
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError) throw userError;
+        if (!user) {
           setError('You must be logged in to view leagues.');
-        return;
-      }
+          return;
+        }
 
         // Try to fetch the league - RLS will prevent access if user is not a member
         const { data: leagueData, error: leagueError } = await supabase
@@ -1386,8 +1376,8 @@ export default function LeaguePage() {
 
         if (leagueError || !leagueData) {
           setError('You do not have access to this league.');
-        return;
-      }
+          return;
+        }
 
         // Check if user is admin
         const { data: memberData, error: memberError } = await supabase
@@ -1403,9 +1393,8 @@ export default function LeaguePage() {
 
         setError(null);
       } catch (err) {
-        console.error('Error checking league access:', err);
         setError('An error occurred while checking league access.');
-    } finally {
+      } finally {
         setIsLoading(false);
       }
     }
@@ -1425,17 +1414,17 @@ export default function LeaguePage() {
   }
 
   if (error) {
-  return (
+    return (
       <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
         <div className="text-center">
           <div className="text-error-500 mb-2">
             <svg className="h-8 w-8 mx-auto" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
             </svg>
-              </div>
+          </div>
           <p className="text-gray-500 dark:text-gray-400">{error}</p>
-            </div>
         </div>
+      </div>
     );
   }
   
@@ -1506,11 +1495,11 @@ export default function LeaguePage() {
               </svg>
               {t('common.actions.inviteMember')}
             </Button>
-            </div>
+          </div>
         )}
 
         <Tabs tabs={tabs} variant="default" />
-            </div>
-          </div>
+      </div>
+    </div>
   );
 } 
