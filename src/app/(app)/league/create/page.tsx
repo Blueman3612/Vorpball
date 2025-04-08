@@ -1256,16 +1256,7 @@ export default function LeaguePage() {
         </div>
 
         {/* Action Buttons */}
-        <div className="px-8 py-8 border-gray-200 dark:border-gray-700 flex justify-end gap-4">
-          <Button
-            variant="outline"
-            onClick={() => {
-              // TODO: Implement save as draft
-              addToast('Save as draft not implemented yet', 'success');
-            }}
-          >
-            {t('common.actions.saveAsDraft')}
-          </Button>
+        <div className="px-8 py-8 border-gray-200 dark:border-gray-700 flex justify-end">
           <Button
             variant="affirmative"
             onClick={handleCreate}
