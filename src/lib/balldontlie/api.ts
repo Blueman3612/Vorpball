@@ -6,14 +6,31 @@ const CURRENT_SEASON = 2024; // 2024-25 season
 
 console.log('API Key loaded:', API_KEY ? 'Yes' : 'No');
 
+// Create a clean instance of axios with the correct configuration
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Authorization': API_KEY
-  },
+  }
 });
 
-// Add response interceptor for rate limiting
+// Add request interceptor to log and verify headers
+api.interceptors.request.use(config => {
+  // Remove any old RapidAPI headers if they exist
+  delete config.headers['X-RapidAPI-Key'];
+  delete config.headers['X-RapidAPI-Host'];
+  
+  // Ensure Authorization header is set correctly (not as Bearer token)
+  const authHeader = config.headers['Authorization'];
+  if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+    config.headers['Authorization'] = API_KEY;
+  }
+  
+  console.log('Request headers:', config.headers);
+  return config;
+});
+
+// Add response interceptor for rate limiting and error logging
 api.interceptors.response.use(
   response => response,
   async error => {
@@ -34,6 +51,27 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// Add test function to verify API connectivity
+export const testApiConnection = async () => {
+  try {
+    console.log('Testing API connection with /teams endpoint...');
+    console.log('Using headers:', api.defaults.headers);
+    const response = await api.get('/teams');
+    console.log('API test successful! First team:', response.data.data[0]);
+    return true;
+  } catch (error) {
+    console.error('API test failed:', error);
+    if (axios.isAxiosError(error)) {
+      console.error('Error details:', {
+        status: error.response?.status,
+        message: error.message,
+        headers: error.config?.headers
+      });
+    }
+    return false;
+  }
+};
 
 export interface Player {
   id: number;
