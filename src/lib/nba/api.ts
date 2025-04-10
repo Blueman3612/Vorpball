@@ -1,5 +1,10 @@
 const NBA_API_BASE = 'https://stats.nba.com/stats';
 
+// Utility function to convert non-English characters to English equivalents
+function normalizeName(name: string): string {
+  return name.normalize('NFD').replace(/\p{Diacritic}/gu, '');
+}
+
 export async function getNBAPlayerID(firstName: string, lastName: string): Promise<number | null> {
   try {
     const response = await fetch(
@@ -22,12 +27,16 @@ export async function getNBAPlayerID(firstName: string, lastName: string): Promi
     const data = await response.json();
     const players = data.resultSets[0].rowSet;
     
+    // Normalize input names
+    const normalizedFirstName = normalizeName(firstName);
+    const normalizedLastName = normalizeName(lastName);
+    
     // Find player by name
     const player = players.find((player: [number, string, ...unknown[]]) => {
       const [, playerName] = player;
       const [playerLastName, playerFirstName] = playerName.split(', ');
-      return playerFirstName.toLowerCase() === firstName.toLowerCase() && 
-             playerLastName.toLowerCase() === lastName.toLowerCase();
+      return normalizeName(playerFirstName.toLowerCase()) === normalizedFirstName.toLowerCase() && 
+             normalizeName(playerLastName.toLowerCase()) === normalizedLastName.toLowerCase();
     });
 
     if (player) {

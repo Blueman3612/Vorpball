@@ -56,7 +56,10 @@ export async function syncPlayer(player: Player, signal?: AbortSignal) {
       let nba_cdn_id = existingPlayer?.nba_cdn_id;
       if (!nba_cdn_id) {
         console.log(`Looking up NBA CDN ID for ${fullName}...`);
-        nba_cdn_id = await getNBAPlayerID(player.first_name, player.last_name);
+        // Normalize names for NBA CDN lookup
+        const normalizedFirstName = normalizeName(player.first_name);
+        const normalizedLastName = normalizeName(player.last_name);
+        nba_cdn_id = await getNBAPlayerID(normalizedFirstName, normalizedLastName);
         if (nba_cdn_id) {
           console.log(`Found NBA CDN ID for ${fullName}: ${nba_cdn_id}`);
           player.nba_cdn_id = nba_cdn_id;
@@ -169,6 +172,11 @@ export async function syncPlayerStats(playerId: number, stats: PlayerStats, sign
   }
 
   return data;
+}
+
+// Utility function to convert non-English characters to English equivalents
+function normalizeName(name: string): string {
+  return name.normalize('NFD').replace(/\p{Diacritic}/gu, '');
 }
 
 // New function to get all teams from all active players
