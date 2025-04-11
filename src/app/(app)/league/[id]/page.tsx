@@ -1377,7 +1377,35 @@ export default function LeaguePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    // Initialize from URL hash if available, otherwise default to 'dashboard'
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash.slice(1);
+      return hash || 'dashboard';
+    }
+    return 'dashboard';
+  });
   
+  // Update URL hash when tab changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.location.hash = activeTab;
+    }
+  }, [activeTab]);
+
+  // Listen for hash changes (e.g., when user uses browser back/forward)
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.slice(1);
+      if (hash) {
+        setActiveTab(hash);
+      }
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
   // Check if user has access to this league
   useEffect(() => {
     async function checkAccess() {
@@ -1522,7 +1550,7 @@ export default function LeaguePage() {
           </div>
         )}
 
-        <Tabs tabs={tabs} variant="default" />
+        <Tabs tabs={tabs} variant="default" activeTab={activeTab} onTabChange={setActiveTab} />
       </div>
     </div>
   );

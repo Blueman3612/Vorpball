@@ -15,6 +15,8 @@ interface TabsProps {
   className?: string;
   variant?: 'default' | 'pills';
   size?: 'sm' | 'md' | 'lg';
+  activeTab?: string;
+  onTabChange?: (tabId: string) => void;
 }
 
 export function Tabs({
@@ -23,8 +25,21 @@ export function Tabs({
   className,
   variant = 'default',
   size = 'md',
+  activeTab: controlledActiveTab,
+  onTabChange,
 }: TabsProps) {
-  const [activeTab, setActiveTab] = useState(defaultTab || tabs[0]?.id);
+  const [internalActiveTab, setInternalActiveTab] = useState(defaultTab || tabs[0]?.id);
+  
+  // Use controlled or uncontrolled active tab
+  const activeTab = controlledActiveTab !== undefined ? controlledActiveTab : internalActiveTab;
+  
+  const handleTabChange = (tabId: string) => {
+    if (onTabChange) {
+      onTabChange(tabId);
+    } else {
+      setInternalActiveTab(tabId);
+    }
+  };
 
   return (
     <div className={cn('w-full space-y-4', className)}>
@@ -38,7 +53,7 @@ export function Tabs({
         {tabs.map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => handleTabChange(tab.id)}
             className={cn(
               'relative font-medium transition-all duration-200',
               // Size variants
