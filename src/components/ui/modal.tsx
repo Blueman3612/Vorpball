@@ -96,7 +96,7 @@ export function Modal({
             <button
               onClick={onClose}
               className={cn(
-                'absolute right-4 top-4',
+                'absolute right-4 top-5',
                 'p-1 rounded-lg',
                 'text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400',
                 'hover:bg-gray-100 dark:hover:bg-gray-700',

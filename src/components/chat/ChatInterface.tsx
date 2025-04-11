@@ -9,6 +9,7 @@ import { addToast } from '@/components/ui/toast';
 import { ConfirmationModal, Modal } from '@/components/ui/modal';
 import { EmojiPicker } from '@/components/ui/emoji-picker';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 interface Channel {
   id: string;
@@ -1214,7 +1215,13 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
 
   // Add function to handle channel creation
   const handleCreateChannel = async () => {
-    if (!newChannelName.trim()) return;
+    if (!newChannelName.trim() || !userRole) return;
+    
+    // Ensure only admins can create channels
+    if (userRole !== 'admin') {
+      addToast('Only admins can create channels', 'error');
+      return;
+    }
     
     try {
       setIsCreatingChannel(true);
@@ -1947,7 +1954,6 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
           setNewChannelDescription('');
         }}
         title="Create New Channel"
-        description="Create a new channel for your league members to chat in."
         footer={
           <>
             <Button
@@ -1972,46 +1978,35 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
           </>
         }
       >
-        <div className="space-y-4">
-          <div>
-            <label htmlFor="channelName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Channel Name
-            </label>
-            <input
-              type="text"
-              id="channelName"
-              value={newChannelName}
-              onChange={(e) => setNewChannelName(e.target.value)}
-              placeholder="e.g. announcements"
-              className={cn(
-                'w-full px-3 py-2 rounded-md',
-                'bg-white dark:bg-gray-900',
-                'border border-gray-300 dark:border-gray-700',
-                'focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500',
-                'placeholder-gray-400 dark:placeholder-gray-600'
-              )}
-            />
-          </div>
-          <div>
-            <label htmlFor="channelDescription" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Description (Optional)
-            </label>
-            <input
-              type="text"
-              id="channelDescription"
-              value={newChannelDescription}
-              onChange={(e) => setNewChannelDescription(e.target.value)}
-              placeholder="What's this channel about?"
-              className={cn(
-                'w-full px-3 py-2 rounded-md',
-                'bg-white dark:bg-gray-900',
-                'border border-gray-300 dark:border-gray-700',
-                'focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500',
-                'placeholder-gray-400 dark:placeholder-gray-600'
-              )}
-            />
-          </div>
-        </div>
+        <form 
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (newChannelName.trim() && !isCreatingChannel) {
+              handleCreateChannel();
+            }
+          }}
+          className="space-y-4"
+        >
+          <Input
+            label="Channel Name"
+            value={newChannelName}
+            onChange={(e) => setNewChannelName(e.target.value)}
+            required
+          />
+          <Input
+            label="Description"
+            value={newChannelDescription}
+            onChange={(e) => setNewChannelDescription(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && newChannelName.trim() && !isCreatingChannel) {
+                e.preventDefault();
+                handleCreateChannel();
+              }
+            }}
+          />
+          {/* Hidden submit button to handle form submission */}
+          <button type="submit" className="hidden" />
+        </form>
       </Modal>
     </div>
   );
