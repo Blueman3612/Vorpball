@@ -160,6 +160,10 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
   const [newChannelDescription, setNewChannelDescription] = useState('');
   const [isCreatingChannel, setIsCreatingChannel] = useState(false);
 
+  // Add new state for channel deletion
+  const [channelToDelete, setChannelToDelete] = useState<Channel | null>(null);
+  const [isDeletingChannel, setIsDeletingChannel] = useState(false);
+
   // Scroll to bottom of messages
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -1278,17 +1282,105 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
     {
       channel: `league-channels:${leagueId}`,
       table: 'league_channels',
-      event: 'INSERT',
+      event: 'DELETE',
       filter: `league_id=eq.${leagueId}`,
       callback: async (payload) => {
-        if (!payload.new) return;
-        const newChannel = payload.new as Channel;
-        
-        setChannels(prev => [...prev, newChannel]);
+        if (payload.eventType === 'DELETE' && payload.old) {
+          const deletedChannel = payload.old as Channel;
+          setChannels(prev => prev.filter(c => c.id !== deletedChannel.id));
+        }
       }
     },
     [leagueId]
   );
+
+  // Separate subscription for INSERT events
+  useRealtimeSubscription<{
+    id: string;
+    name: string;
+    description: string | null;
+    type: 'text' | 'announcement';
+    position: number;
+    permissions: 'everyone' | 'admin';
+  }>(
+    {
+      channel: `league-channels:${leagueId}`,
+      table: 'league_channels',
+      event: 'INSERT',
+      filter: `league_id=eq.${leagueId}`,
+      callback: async (payload) => {
+        if (payload.eventType === 'INSERT' && payload.new) {
+          const newChannel = payload.new as Channel;
+          setChannels(prev => [...prev, newChannel]);
+        }
+      }
+    },
+    [leagueId]
+  );
+
+  // Add function to handle channel deletion
+  const handleDeleteChannel = async () => {
+    if (!channelToDelete || !userRole) return;
+    
+    // Ensure only admins can delete channels
+    if (userRole !== 'admin') {
+      addToast('Only admins can delete channels', 'error');
+      return;
+    }
+
+    // Prevent deletion of protected channels
+    if (channelToDelete.name === 'general' || channelToDelete.name === 'announcements') {
+      addToast('Cannot delete protected channels', 'error');
+      return;
+    }
+    
+    try {
+      setIsDeletingChannel(true);
+      
+      // First delete all messages in the channel
+      const { error: messagesError } = await supabase
+        .from('channel_messages')
+        .delete()
+        .eq('channel_id', channelToDelete.id);
+
+      if (messagesError) throw messagesError;
+
+      // Then delete the channel
+      const { error: deleteError } = await supabase
+        .from('league_channels')
+        .delete()
+        .eq('id', channelToDelete.id);
+
+      if (deleteError) throw deleteError;
+
+      // If we were viewing this channel, switch to general
+      if (currentChannel === channelToDelete.id) {
+        const generalChannel = channels.find(c => c.name === 'general');
+        if (generalChannel) {
+          setCurrentChannel(generalChannel.id);
+        }
+      }
+
+      // Update channels state to remove the deleted channel
+      setChannels(prev => prev.filter(c => c.id !== channelToDelete.id));
+
+      addToast('Channel deleted successfully', 'success');
+      setChannelToDelete(null);
+      
+    } catch (err) {
+      console.error('Error deleting channel:', err);
+      addToast('Failed to delete channel', 'error');
+    } finally {
+      setIsDeletingChannel(false);
+    }
+  };
+
+  // Function to check if a channel can be deleted
+  const canDeleteChannel = (channel: Channel) => {
+    return userRole === 'admin' && 
+           channel.name !== 'general' && 
+           channel.name !== 'announcements';
+  };
 
   if (isLoading) {
     return (
@@ -1338,28 +1430,48 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
           </div>
           <CustomScrollArea className="h-[calc(100%-4rem)]">
             {channels.map((channel) => (
-              <button
+              <div
                 key={channel.id}
-                onClick={() => setCurrentChannel(channel.id)}
-                className={cn(
-                  'w-full px-4 py-2 text-left text-sm transition-colors',
-                  'flex items-center gap-2',
-                  channel.id === currentChannel
-                    ? 'bg-gray-100/50 dark:bg-gray-700/30 text-gray-900 dark:text-white'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100/30 dark:hover:bg-gray-700/20'
-                )}
+                className="group relative"
               >
-                {channel.type === 'announcement' ? (
-                  <svg className="h-4 w-4 text-gray-500 dark:text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M18 3a1 1 0 00-1.447-.894L8.763 6H5a3 3 0 000 6h.28l1.771 5.316A1 1 0 008 18h1a1 1 0 001-1v-4.382l6.553 3.276A1 1 0 0018 15V3z" clipRule="evenodd" />
-                  </svg>
-                ) : (
-                  <svg className="h-4 w-4 text-gray-500 dark:text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M18 5v8a2 2 0 01-2 2h-5l-5 4v-4H4a2 2 0 01-2-2V5a2 2 0 012-2h12a2 2 0 012 2zM7 8H5v2h2V8zm2 0h2v2H9V8zm6 0h-2v2h2V8z" clipRule="evenodd" />
-                  </svg>
+                <button
+                  onClick={() => setCurrentChannel(channel.id)}
+                  className={cn(
+                    'w-full px-4 py-2 text-left text-sm transition-colors',
+                    'flex items-center gap-2',
+                    channel.id === currentChannel
+                      ? 'bg-gray-100/50 dark:bg-gray-700/30 text-gray-900 dark:text-white'
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100/30 dark:hover:bg-gray-700/20'
+                  )}
+                >
+                  {channel.type === 'announcement' ? (
+                    <svg className="h-4 w-4 text-gray-500 dark:text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M18 3a1 1 0 00-1.447-.894L8.763 6H5a3 3 0 000 6h.28l1.771 5.316A1 1 0 008 18h1a1 1 0 001-1v-4.382l6.553 3.276A1 1 0 0018 15V3z" clipRule="evenodd" />
+                    </svg>
+                  ) : (
+                    <svg className="h-4 w-4 text-gray-500 dark:text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M18 5v8a2 2 0 01-2 2h-5l-5 4v-4H4a2 2 0 01-2-2V5a2 2 0 012-2h12a2 2 0 012 2zM7 8H5v2h2V8zm2 0h2v2H9V8zm6 0h-2v2h2V8z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                  # {channel.name}
+                </button>
+                {canDeleteChannel(channel) && (
+                  <button
+                    onClick={() => setChannelToDelete(channel)}
+                    className={cn(
+                      'absolute right-2 top-1/2 -translate-y-1/2',
+                      'w-6 h-6 inline-flex items-center justify-center',
+                      'text-gray-400 hover:text-error-500 dark:text-gray-500 dark:hover:text-error-400',
+                      'rounded transition-colors opacity-0 group-hover:opacity-100',
+                      'hover:bg-gray-100 dark:hover:bg-gray-800'
+                    )}
+                  >
+                    <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                  </button>
                 )}
-                # {channel.name}
-              </button>
+              </div>
             ))}
           </CustomScrollArea>
         </div>
@@ -2008,6 +2120,19 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
           <button type="submit" className="hidden" />
         </form>
       </Modal>
+
+      {/* Channel Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={!!channelToDelete}
+        onClose={() => setChannelToDelete(null)}
+        onConfirm={handleDeleteChannel}
+        title="Delete Channel"
+        description={`Are you sure you want to delete #${channelToDelete?.name}? This action cannot be undone and will delete all messages in this channel.`}
+        confirmText="Delete Channel"
+        cancelText="Cancel"
+        isDestructive={true}
+        isLoading={isDeletingChannel}
+      />
     </div>
   );
 }  
