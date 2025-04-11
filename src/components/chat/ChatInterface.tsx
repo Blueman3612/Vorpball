@@ -6,8 +6,9 @@ import { useRealtimeSubscription } from '@/lib/hooks/useRealtimeSubscription';
 import { useTranslations } from '@/lib/i18n';
 import Image from 'next/image';
 import { addToast } from '@/components/ui/toast';
-import { ConfirmationModal } from '@/components/ui/modal';
+import { ConfirmationModal, Modal } from '@/components/ui/modal';
 import { EmojiPicker } from '@/components/ui/emoji-picker';
+import { Button } from '@/components/ui/button';
 
 interface Channel {
   id: string;
@@ -151,6 +152,12 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   // Add a flag to track if messages update is from a thread reply
   const isThreadReplyUpdate = useRef(false);
+
+  // Add new state for channel creation
+  const [showCreateChannel, setShowCreateChannel] = useState(false);
+  const [newChannelName, setNewChannelName] = useState('');
+  const [newChannelDescription, setNewChannelDescription] = useState('');
+  const [isCreatingChannel, setIsCreatingChannel] = useState(false);
 
   // Scroll to bottom of messages
   const scrollToBottom = useCallback(() => {
@@ -1205,6 +1212,77 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
     }
   };
 
+  // Add function to handle channel creation
+  const handleCreateChannel = async () => {
+    if (!newChannelName.trim()) return;
+    
+    try {
+      setIsCreatingChannel(true);
+      
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      if (!user) {
+        setError('You must be logged in to create channels.');
+        return;
+      }
+
+      // Get the highest position to place new channel at the end
+      const maxPosition = Math.max(...channels.map(c => c.position), -1) + 1;
+
+      const { error: createError } = await supabase
+        .from('league_channels')
+        .insert({
+          league_id: leagueId,
+          name: newChannelName.trim().toLowerCase(),
+          description: newChannelDescription.trim() || null,
+          type: 'text',
+          position: maxPosition,
+          created_by: user.id,
+          permissions: 'everyone'
+        });
+
+      if (createError) throw createError;
+
+      // Show success message
+      addToast('Channel created successfully!', 'success');
+      
+      // Close modal and reset form
+      setShowCreateChannel(false);
+      setNewChannelName('');
+      setNewChannelDescription('');
+      
+    } catch (err) {
+      console.error('Error creating channel:', err);
+      addToast('Failed to create channel. Please try again.', 'error');
+    } finally {
+      setIsCreatingChannel(false);
+    }
+  };
+
+  // Add realtime subscription for channel updates
+  useRealtimeSubscription<{
+    id: string;
+    name: string;
+    description: string | null;
+    type: 'text' | 'announcement';
+    position: number;
+    permissions: 'everyone' | 'admin';
+  }>(
+    {
+      channel: `league-channels:${leagueId}`,
+      table: 'league_channels',
+      event: 'INSERT',
+      filter: `league_id=eq.${leagueId}`,
+      callback: async (payload) => {
+        if (!payload.new) return;
+        const newChannel = payload.new as Channel;
+        
+        setChannels(prev => [...prev, newChannel]);
+      }
+    },
+    [leagueId]
+  );
+
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -1237,7 +1315,19 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
         {/* Channels Sidebar */}
         <div className="w-60 flex-shrink-0 border-r border-gray-300/50 dark:border-gray-700/30">
           <div className="p-4 border-b border-gray-300/50 dark:border-gray-700/30">
-            <h3 className="text-base font-medium text-gray-900 dark:text-gray-100">{t('common.chat.channels')}</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-medium text-gray-900 dark:text-gray-100">{t('common.chat.channels')}</h3>
+              {userRole === 'admin' && (
+                <button
+                  onClick={() => setShowCreateChannel(true)}
+                  className="w-6 h-6 inline-flex items-center justify-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              )}
+            </div>
           </div>
           <CustomScrollArea className="h-[calc(100%-4rem)]">
             {channels.map((channel) => (
@@ -1847,6 +1937,82 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
         isDestructive={true}
         isLoading={isDeleting}
       />
+
+      {/* Create Channel Modal */}
+      <Modal
+        isOpen={showCreateChannel}
+        onClose={() => {
+          setShowCreateChannel(false);
+          setNewChannelName('');
+          setNewChannelDescription('');
+        }}
+        title="Create New Channel"
+        description="Create a new channel for your league members to chat in."
+        footer={
+          <>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowCreateChannel(false);
+                setNewChannelName('');
+                setNewChannelDescription('');
+              }}
+              disabled={isCreatingChannel}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleCreateChannel}
+              isLoading={isCreatingChannel}
+              disabled={!newChannelName.trim() || isCreatingChannel}
+            >
+              Create Channel
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label htmlFor="channelName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Channel Name
+            </label>
+            <input
+              type="text"
+              id="channelName"
+              value={newChannelName}
+              onChange={(e) => setNewChannelName(e.target.value)}
+              placeholder="e.g. announcements"
+              className={cn(
+                'w-full px-3 py-2 rounded-md',
+                'bg-white dark:bg-gray-900',
+                'border border-gray-300 dark:border-gray-700',
+                'focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500',
+                'placeholder-gray-400 dark:placeholder-gray-600'
+              )}
+            />
+          </div>
+          <div>
+            <label htmlFor="channelDescription" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Description (Optional)
+            </label>
+            <input
+              type="text"
+              id="channelDescription"
+              value={newChannelDescription}
+              onChange={(e) => setNewChannelDescription(e.target.value)}
+              placeholder="What's this channel about?"
+              className={cn(
+                'w-full px-3 py-2 rounded-md',
+                'bg-white dark:bg-gray-900',
+                'border border-gray-300 dark:border-gray-700',
+                'focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500',
+                'placeholder-gray-400 dark:placeholder-gray-600'
+              )}
+            />
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }  
