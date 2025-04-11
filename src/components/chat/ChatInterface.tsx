@@ -2104,6 +2104,7 @@ export function ChatInterface({ leagueId, className }: ChatInterfaceProps) {
             value={newChannelName}
             onChange={(e) => setNewChannelName(e.target.value)}
             required
+            autoFocus
           />
           <Input
             label="Description"
